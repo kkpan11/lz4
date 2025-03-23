@@ -62,13 +62,17 @@ endif
 
 ALLFLAGS  = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
+vpath %.c $(LIBDIR) .
+C_SRCS = $(notdir $(SRCFILES))
+include ../multiconf.make
+
 # thread detection
 NUM_SYMBOL   := \#
-NO_THREAD_MSG:= ==> no multithread support: building for single-thread mode only
+NO_THREAD_MSG:= ==> no multithread support: built for single-thread mode only
 HAVE_PTHREAD := $(shell printf '$(NUM_SYMBOL)include <pthread.h>\nint main(void) { return 0; }' > have_pthread.c && $(CC) $(ALLFLAGS) -o have_pthread$(EXT) have_pthread.c -pthread 2> $(VOID) && rm -f have_pthread$(EXT) && echo 1 || echo 0; rm have_pthread.c)
 HAVE_MULTITHREAD  := $(shell [ "$(HAVE_PTHREAD)" -eq "1" -o -n "$(filter Windows%,$(OS))" ] && echo 1 || echo 0)
 ifeq ($(HAVE_MULTITHREAD), 1)
-  THREAD_MSG := ==> building with multithreading support
+  THREAD_MSG := ==> built with multithreading support
   THREAD_CPP := -DLZ4IO_MULTITHREAD
   ifeq ($(HAVE_PTHREAD), 1)
     THREAD_LD  := -pthread
@@ -94,6 +98,8 @@ all: lz4 lz4-nomt lz4c unlz4 lz4cat
 all32: CFLAGS+=-m32
 all32: all
 
+LZ4_OBJS := $(notdir $(OBJFILES))
+
 ifeq ($(WINBASED),yes)
 lz4-exe.rc: lz4-exe.rc.in
 	@echo creating executable resource
@@ -113,22 +119,19 @@ lz4: $(OBJFILES) lz4-exe.o
 	echo "$(THREAD_MSG)"
 	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
 else
+
 lz4: CPPFLAGS += $(THREAD_CPP)
 lz4: LDFLAGS += $(THREAD_LD)
-lz4: $(OBJFILES)
-	echo "$(THREAD_MSG)"
-	$(CC) $(ALLFLAGS) $(OBJFILES) -o $@$(EXT) $(LDLIBS)
+$(eval $(call build_c_program,lz4,$(LZ4_OBJS),,echo "$(THREAD_MSG)"))
 endif
-CLEAN += lz4
 
 .PHONY: lz4-release
 lz4-release: DEBUGFLAGS=
 lz4-release: CPPFLAGS+=-DNDEBUG
 lz4-release: lz4
 
-CLEAN += lz4-nomt
-lz4-nomt: $(SRCFILES)
-	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
+lz4-nomt:
+$(eval $(call build_c_program,lz4-nomt,$(LZ4_OBJS)))
 
 CLEAN += lz4-wlib
 lz4-wlib: LIBFILES =
@@ -147,10 +150,8 @@ CLEAN += lz4c
 lz4c: lz4
 	$(LN_SF) lz4$(EXT) lz4c$(EXT)
 
-CLEAN += lz4c32
 lz4c32: CFLAGS += -m32
-lz4c32 : $(SRCFILES)
-	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
+$(eval $(call build_c_program,lz4c32,$(LZ4_OBJS)))
 
 CLEAN += unlz4
 unlz4: lz4
@@ -180,7 +181,8 @@ ifeq ($(WINBASED),yes)
 	$(RM) *.rc
 endif
 	$(MAKE) -C $(LIBDIR) $@ > $(VOID)
-	$(RM) $(CLEAN) *.o tmp* *.test core
+	$(RM) $(CLEAN) $(ALL_PROGRAMS) *.o tmp* *.test core
+	$(RM) -rf $(CACHE_ROOT)
 	@echo Cleaning completed
 
 
