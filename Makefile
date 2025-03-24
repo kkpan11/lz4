@@ -38,6 +38,7 @@ FUZZDIR = ossfuzz
 
 include Makefile.inc
 
+MAKE += --no-print-directory
 
 .PHONY: default
 default: lib-release lz4-release

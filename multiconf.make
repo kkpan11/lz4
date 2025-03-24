@@ -23,18 +23,23 @@
 # Provides build_library, build_program and build_cxx_program
 # Provides V=1 / VERBOSE=1 support. V=2 is used for debugging purposes.
 # Provides ALL_PROGRAMS: contain all binary names created with above functions
-# Support recompilation of impacted units when an associated *.h is updated.
+# Support recompilation of units when any dependent *.h is updated.
 
 # Requires:
-# - vpath set to find all source files
-# - C_SRCS, CXX_SRCS and ASM_SRCS variables defined
-# - directory `obj/` available to cache object files.
+# - C_SRCDIRS, CXX_SRCDIRS, ASM_SRCDIRS defined
+#   OR
+#   C_SRCS, CXX_SRCS and ASM_SRCS variables defined
+#   and vpath set to find all source files
+#   OR
+#   C_OBJS, CXX_OBJS and ASM_OBJS variables defined
+#   and vpath set to find all source files
+# - directory `cacheObjs/` available to cache object files.
 #   alternatively, set CACHE_ROOT to some different value.
 # Optional:
 # - HASH can be set to a different custom hash program.
 
 # build_*_program: generates a recipe for a target that will be built in a cache directory.
-# The cache directory is automatically derived from the list of flags and compilers.
+# The cache directory is automatically derived from CACHE_ROOT and list of flags and compilers.
 # The macro function takes up to 4 argument:
 # - The name of the target
 # - The list of object files to build in the cache directory
@@ -47,7 +52,7 @@ VERBOSE ?= $(V)
 $(VERBOSE).SILENT:
 
 # Directory where object files will be built
-CACHE_ROOT := obj
+CACHE_ROOT := cacheObjs
 
 # Header Dependency management
 DEPFLAGS = -MT $@ -MMD -MP -MF
@@ -56,12 +61,12 @@ DEPFLAGS = -MT $@ -MMD -MP -MF
 # flags, so that we can do incremental, parallel builds of different binaries
 # with different build flags without collisions.
 
-UNAME := $(shell uname)
-ifeq ($(UNAME), Darwin)
+UNAME ?= uname
+ifeq ($(shell $(UNAME)), Darwin)
   HASH ?= md5
-else ifeq ($(UNAME), FreeBSD)
+else ifeq ($(shell $(UNAME)), FreeBSD)
   HASH ?= gmd5sum
-else ifeq ($(UNAME), OpenBSD)
+else ifeq ($(shell $(UNAME)), OpenBSD)
   HASH ?= md5
 endif
 HASH ?= md5sum
@@ -76,7 +81,7 @@ endif
 
 # OSX linker doen't support --whole-archive and --no-whole-archive, so we are using -force_load and
 # -load_hidden instead
-ifeq ($(UNAME), Darwin)
+ifeq ($(shell $(UNAME)), Darwin)
 	WHOLE_ARCHIVE = -force_load
 	NO_WHOLE_ARCHIVE = -load_hidden
 else
@@ -228,10 +233,23 @@ endef # build_cxx_program
 
 # Create targets for individual object files
 
-C_OBJS  := $(patsubst %.c,%.o,$(C_SRCS))
-CXXOBJS := $(patsubst %.cpp,%.o,$(CXX_SRCS))
-ASMOBJS := $(patsubst %.S,%.o,$(ASM_SRCS))
+C_SRCS ?= $(notdir $(foreach dir,$(C_SRCDIRS),$(wildcard $(dir)/*.c)))
+ifneq ($(strip $(C_SRCDIRS)),)
+vpath %.c $(C_SRCDIRS)
+endif
+CXX_SRCS ?= $(notdir $(foreach dir,$(CXX_SRCDIRS),$(wildcard $(dir)/*.c)))
+ifneq ($(strip $(CXX_SRCDIRS)),)
+vpath %.cpp $(CXX_SRCDIRS)
+endif
+ASM_SRCS ?= $(notdir $(foreach dir,$(ASM_SRCDIRS),$(wildcard $(dir)/*.c)))
+ifneq ($(strip $(ASM_SRCDIRS)),)
+vpath %.S $(ASM_SRCDIRS)
+endif
+
+C_OBJS  ?= $(patsubst %.c,%.o,$(C_SRCS))
+CXX_OBJS ?= $(patsubst %.cpp,%.o,$(CXX_SRCS))
+ASM_OBJS ?= $(patsubst %.S,%.o,$(ASM_SRCS))
 
 $(foreach OBJ,$(C_OBJS),$(eval $(call addTargetObject,$(OBJ))))
-$(foreach OBJ,$(ASMOBJS),$(eval $(call addTargetAsmObject,$(OBJ))))
-$(foreach OBJ,$(CXXOBJS),$(eval $(call addTargetCxxObject,$(OBJ))))
+$(foreach OBJ,$(CXX_OBJS),$(eval $(call addTargetCxxObject,$(OBJ))))
+$(foreach OBJ,$(ASM_OBJS),$(eval $(call addTargetAsmObject,$(OBJ))))

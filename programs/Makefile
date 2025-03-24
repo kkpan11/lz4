@@ -62,8 +62,10 @@ endif
 
 ALLFLAGS  = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
-vpath %.c $(LIBDIR) .
-C_SRCS = $(notdir $(SRCFILES))
+.PHONY:default
+default: lz4-release
+
+C_SRCDIRS = $(LIBDIR) .
 include ../multiconf.make
 
 # thread detection
@@ -84,9 +86,6 @@ endif
 LZ4_VERSION=$(LIBVER)
 MD2ROFF    = ronn
 MD2ROFF_FLAGS = --roff --warnings --manual="User Commands" --organization="lz4 $(LZ4_VERSION)"
-
-.PHONY:default
-default: lz4-release
 
 # silent mode by default; verbose can be triggered by V=1 or VERBOSE=1
 $(V)$(VERBOSE).SILENT:
