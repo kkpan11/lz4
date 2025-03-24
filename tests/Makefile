@@ -47,6 +47,8 @@ include ../Makefile.inc
 
 LZ4 := $(PRGDIR)/lz4$(EXT)
 
+C_SRCDIRS = $(LIBDIR) $(PRGDIR) .
+include ../multiconf.make
 
 # Default test parameters
 TEST_FILES   := COPYING
@@ -82,11 +84,9 @@ lz4c32:  # create a 32-bits version for 32/64 interop tests
 %.o : $(LIBDIR)/%.c $(LIBDIR)/%.h
 	$(CC) -c $(CFLAGS) $(CPPFLAGS) $< -o $@
 
-CLEAN += fullbench
 fullbench : DEBUGLEVEL=0
 fullbench : CPPFLAGS += -DNDEBUG
-fullbench : lz4.o lz4hc.o lz4frame.o xxhash.o fullbench.c
-	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
+$(eval $(call build_c_program,fullbench,fullbench.o lz4.o lz4hc.o lz4frame.o xxhash.o))
 
 .PHONY: $(LIBDIR)/liblz4.a
 $(LIBDIR)/liblz4.a:
@@ -109,44 +109,37 @@ fullbench-dll: fullbench.c $(LIBDIR)/xxhash.c
 endif
 
 # test LZ4_USER_MEMORY_FUNCTIONS
+.PHONY: fullbench-wmalloc
 fullbench-wmalloc: CPPFLAGS += -DLZ4_USER_MEMORY_FUNCTIONS
 fullbench-wmalloc: fullbench
 
-CLEAN += fuzzer
-fuzzer  : lz4.o lz4hc.o xxhash.o fuzzer.c
-	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
+fuzzer:
+$(eval $(call build_c_program,fuzzer,lz4.o lz4hc.o xxhash.o fuzzer.o))
 
-CLEAN += frametest
-frametest: lz4frame.o lz4.o lz4hc.o xxhash.o frametest.c
-	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
+frametest:
+$(eval $(call build_c_program,frametest,lz4frame.o lz4.o lz4hc.o xxhash.o frametest.o))
 
-CLEAN += roundTripTest
-roundTripTest : lz4.o lz4hc.o xxhash.o roundTripTest.c
-	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
+roundTripTest:
+$(eval $(call build_c_program,roundTripTest,lz4.o lz4hc.o xxhash.o roundTripTest.o))
 
-CLEAN += datagen
 datagen: CPPFLAGS+=-DNDEBUG
-datagen : datagen.c $(PRGDIR)/lorem.c loremOut.c datagencli.c
-	$(CC) $(ALLFLAGS) -I$(PRGDIR) $^ -o $@$(EXT)
+$(eval $(call build_c_program,datagen,datagen.o lorem.o loremOut.o datagencli.o))
 
-CLEAN += checkFrame
-checkFrame : lz4frame.o lz4.o lz4hc.o xxhash.o checkFrame.c
-	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
+checkFrame:
+$(eval $(call build_c_program,checkFrame,lz4.o lz4hc.o xxhash.o lz4frame.o checkFrame.o))
 
-CLEAN += decompress-partial
-decompress-partial: lz4.o decompress-partial.c
-	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
+decompress-partial:
+$(eval $(call build_c_program,decompress-partial,lz4.o decompress-partial.o))
 
-CLEAN += decompress-partial-usingDict
-decompress-partial-usingDict: lz4.o decompress-partial-usingDict.c
-	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
+decompress-partial-usingDict:
+$(eval $(call build_c_program,decompress-partial-usingDict,lz4.o decompress-partial-usingDict.o))
 
 .PHONY: clean
 clean:
 	@$(MAKE) -C $(LIBDIR) $@ > $(VOID)
 	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
-	@$(RM) $(CLEAN) core *.o *.test tmp*
-	@$(RM) -r $(TESTDIR)
+	@$(RM) $(CLEAN) $(ALL_PROGRAMS) core *.o *.test tmp*
+	@$(RM) -r $(TESTDIR) $(CACHE_ROOT)
 	@echo Cleaning completed
 
 .PHONY: versionsTest
@@ -165,9 +158,9 @@ abiTest: LDLIBS += -llz4
 abiTests:
 	$(PYTHON) test-lz4-abi.py
 
-CLEAN += checkTag
-checkTag: checkTag.c $(LIBDIR)/lz4.h
-	$(CC) $(ALLFLAGS) $< -o $@$(EXT)
+checkTag:
+$(eval $(call build_c_program,checkTag,checkTag.o))
+
 
 #-----------------------------------------------------------------------------
 # validated only for Linux, OSX, BSD, Hurd and Solaris targets
