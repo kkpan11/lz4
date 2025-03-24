@@ -115,10 +115,9 @@ lz4-exe.o: lz4-exe.rc
 
 lz4: CPPFLAGS += $(THREAD_CPP)
 lz4: LDFLAGS += $(THREAD_LD)
-lz4: $(OBJFILES) lz4-exe.o
-	echo "$(THREAD_MSG)"
-	$(CC) $(ALLFLAGS) $^ -o $@$(EXT)
-else
+$(eval $(call build_c_program,lz4,$(LZ4_OBJS),lz4-exe.o,echo "$(THREAD_MSG)"))
+
+else # not WINBASED
 
 lz4: CPPFLAGS += $(THREAD_CPP)
 lz4: LDFLAGS += $(THREAD_LD)

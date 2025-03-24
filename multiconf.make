@@ -88,7 +88,6 @@ endif
 MKDIR ?= mkdir
 RANLIB ?= ranlib
 LN ?= ln
-CURL ?= curl
 
 # Create build directories on-demand.
 #
