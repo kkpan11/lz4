@@ -76,6 +76,10 @@ else
 		SHARED_EXT_MAJOR = $(SHARED_EXT).$(LIBVER_MAJOR)
 		SHARED_EXT_VER = $(SHARED_EXT).$(LIBVER)
 	endif
+# AIX linker doesn't support -soname, hence assigning nil string
+ifeq ($(TARGET_OS), AIX)
+	SONAME_FLAGS =
+endif
 endif
 
 .PHONY: default
