@@ -624,6 +624,19 @@ jobs:
         cmake -S tests/cmake -B build_test -D CMAKE_INSTALL_PREFIX=install
         VERBOSE=1 cmake --build build_test
 
+    - name: cmake minimum version v3.10 test
+      run: |
+        mkdir -p cmake_bins
+        cd cmake_bins
+        wget https://cmake.org/files/v3.10/cmake-3.10.0-Linux-x86_64.tar.gz -P cmake_bins
+        tar xzf cmake_bins/cmake-3.10.0-Linux-x86_64.tar.gz -C cmake_bins
+        mkdir -p cmake_build
+        mkdir -p cmake_install_test
+        cmake_bins/cmake-3.10.0-Linux-x86_64/bin/cmake --version
+        (cd cmake_build; ../cmake_bins/cmake-3.10.0-Linux-x86_64/bin/cmake ../build/cmake)
+        cmake_bins/cmake-3.10.0-Linux-x86_64/bin/cmake --build cmake_build
+        DESTDIR="../cmake_install_test" cmake_bins/cmake-3.10.0-Linux-x86_64/bin/cmake --build cmake_build --target install
+
   lz4-build-cmake-static-lib: # See https://github.com/lz4/lz4/issues/1269
     name: cmake (static lib)
     runs-on: ubuntu-latest
