@@ -50,6 +50,7 @@ ld.exe*
 # test artifacts
 *.lz4
 tmp*
+cmake_download/
 cmake_bins/
 cmake_build/
 cmake_install_test/
