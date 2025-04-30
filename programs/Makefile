@@ -114,13 +114,13 @@ lz4-exe.o: lz4-exe.rc
 
 lz4: CPPFLAGS += $(THREAD_CPP)
 lz4: LDFLAGS += $(THREAD_LD)
-$(eval $(call build_c_program,lz4,$(LZ4_OBJS),lz4-exe.o,echo "$(THREAD_MSG)"))
+$(eval $(call c_program,lz4,$(LZ4_OBJS),lz4-exe.o,echo "$(THREAD_MSG)"))
 
 else # not WINBASED
 
 lz4: CPPFLAGS += $(THREAD_CPP)
 lz4: LDFLAGS += $(THREAD_LD)
-$(eval $(call build_c_program,lz4,$(LZ4_OBJS),,echo "$(THREAD_MSG)"))
+$(eval $(call c_program,lz4,$(LZ4_OBJS),,echo "$(THREAD_MSG)"))
 endif
 
 .PHONY: lz4-release
@@ -129,7 +129,7 @@ lz4-release: CPPFLAGS+=-DNDEBUG
 lz4-release: lz4
 
 lz4-nomt:
-$(eval $(call build_c_program,lz4-nomt,$(LZ4_OBJS)))
+$(eval $(call c_program,lz4-nomt,$(LZ4_OBJS)))
 
 CLEAN += lz4-wlib
 lz4-wlib: LIBFILES =
@@ -149,7 +149,7 @@ lz4c: lz4
 	$(LN_SF) lz4$(EXT) lz4c$(EXT)
 
 lz4c32: CFLAGS += -m32
-$(eval $(call build_c_program,lz4c32,$(LZ4_OBJS)))
+$(eval $(call c_program,lz4c32,$(LZ4_OBJS)))
 
 CLEAN += unlz4
 unlz4: lz4
@@ -174,13 +174,12 @@ preview-man: clean-man man
 	man ./lz4.1
 
 .PHONY:clean
-clean:
+clean: clean_cache
 ifeq ($(WINBASED),yes)
 	$(RM) *.rc
 endif
 	$(MAKE) -C $(LIBDIR) $@ > $(VOID)
-	$(RM) $(CLEAN) $(ALL_PROGRAMS) *.o tmp* *.test core
-	$(RM) -rf $(CACHE_ROOT)
+	$(RM) $(CLEAN) *.o tmp* *.test core
 	@echo Cleaning completed
 
 

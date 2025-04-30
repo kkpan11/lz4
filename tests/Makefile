@@ -30,7 +30,7 @@
 
 LIBDIR  := ../lib
 PRGDIR  := ../programs
-TESTDIR := versionsTest
+VERSIONSTESTDIR := versionsTest
 PYTHON  ?= python3
 
 DEBUGLEVEL?= 1
@@ -86,7 +86,7 @@ lz4c32:  # create a 32-bits version for 32/64 interop tests
 
 fullbench : DEBUGLEVEL=0
 fullbench : CPPFLAGS += -DNDEBUG
-$(eval $(call build_c_program,fullbench,fullbench.o lz4.o lz4hc.o lz4frame.o xxhash.o))
+$(eval $(call c_program,fullbench,fullbench.o lz4.o lz4hc.o lz4frame.o xxhash.o))
 
 .PHONY: $(LIBDIR)/liblz4.a
 $(LIBDIR)/liblz4.a:
@@ -114,32 +114,32 @@ fullbench-wmalloc: CPPFLAGS += -DLZ4_USER_MEMORY_FUNCTIONS
 fullbench-wmalloc: fullbench
 
 fuzzer:
-$(eval $(call build_c_program,fuzzer,lz4.o lz4hc.o xxhash.o fuzzer.o))
+$(eval $(call c_program_shared_o,fuzzer,lz4.o lz4hc.o xxhash.o fuzzer.o))
 
 frametest:
-$(eval $(call build_c_program,frametest,lz4frame.o lz4.o lz4hc.o xxhash.o frametest.o))
+$(eval $(call c_program_shared_o,frametest,lz4frame.o lz4.o lz4hc.o xxhash.o frametest.o))
 
 roundTripTest:
-$(eval $(call build_c_program,roundTripTest,lz4.o lz4hc.o xxhash.o roundTripTest.o))
+$(eval $(call c_program_shared_o,roundTripTest,lz4.o lz4hc.o xxhash.o roundTripTest.o))
 
 datagen: CPPFLAGS+=-DNDEBUG
-$(eval $(call build_c_program,datagen,datagen.o lorem.o loremOut.o datagencli.o))
+$(eval $(call c_program,datagen,datagen.o lorem.o loremOut.o datagencli.o))
 
 checkFrame:
-$(eval $(call build_c_program,checkFrame,lz4.o lz4hc.o xxhash.o lz4frame.o checkFrame.o))
+$(eval $(call c_program_shared_o,checkFrame,lz4.o lz4hc.o xxhash.o lz4frame.o checkFrame.o))
 
 decompress-partial:
-$(eval $(call build_c_program,decompress-partial,lz4.o decompress-partial.o))
+$(eval $(call c_program_shared_o,decompress-partial,lz4.o decompress-partial.o))
 
 decompress-partial-usingDict:
-$(eval $(call build_c_program,decompress-partial-usingDict,lz4.o decompress-partial-usingDict.o))
+$(eval $(call c_program_shared_o,decompress-partial-usingDict,lz4.o decompress-partial-usingDict.o))
 
 .PHONY: clean
-clean:
+clean: clean_cache
 	@$(MAKE) -C $(LIBDIR) $@ > $(VOID)
 	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
-	@$(RM) $(CLEAN) $(ALL_PROGRAMS) core *.o *.test tmp*
-	@$(RM) -r $(TESTDIR) $(CACHE_ROOT)
+	@$(RM) $(CLEAN) core *.o *.test tmp*
+	@$(RM) -r $(VERSIONSTESTDIR)
 	@echo Cleaning completed
 
 .PHONY: versionsTest
@@ -159,7 +159,7 @@ abiTests:
 	$(PYTHON) test-lz4-abi.py
 
 checkTag:
-$(eval $(call build_c_program,checkTag,checkTag.o))
+$(eval $(call c_program_shared_o,checkTag,checkTag.o))
 
 
 #-----------------------------------------------------------------------------

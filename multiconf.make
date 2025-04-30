@@ -20,30 +20,35 @@
 #
 # ##########################################################################
 
-# Provides build_library, build_program and build_cxx_program
+# Provides c_program(_shared_o) and cxx_program(_shared_o)
 # Provides V=1 / VERBOSE=1 support. V=2 is used for debugging purposes.
-# Provides ALL_PROGRAMS: contain all binary names created with above functions
-# Support recompilation of units when any dependent *.h is updated.
+# Provides target clean_cache: delete objects and binaries created with this script
+# Support recompilation of only impacted units when an associated *.h is updated.
 
 # Requires:
 # - C_SRCDIRS, CXX_SRCDIRS, ASM_SRCDIRS defined
 #   OR
 #   C_SRCS, CXX_SRCS and ASM_SRCS variables defined
-#   and vpath set to find all source files
+#   *and* vpath set to find all source files
 #   OR
 #   C_OBJS, CXX_OBJS and ASM_OBJS variables defined
-#   and vpath set to find all source files
+#   *and* vpath set to find all source files
 # - directory `cacheObjs/` available to cache object files.
 #   alternatively, set CACHE_ROOT to some different value.
 # Optional:
 # - HASH can be set to a different custom hash program.
 
-# build_*_program: generates a recipe for a target that will be built in a cache directory.
+# *_program*: generates a recipe for a target that will be built in a cache directory.
 # The cache directory is automatically derived from CACHE_ROOT and list of flags and compilers.
-# The macro function takes up to 4 argument:
+# _shared_o variant is an optional optimization variant, that make it possible for multiple target to share the same objects.
+# However, as a consequence, all these objects must have exactly the same list of flags,
+# which in practice means that there must be no target-level modification (like: target: CFLAGS += someFlag).
+# In unsure, only use the standar variants, c_program and cxx_program.
+
+# All *_program* macro functions take up to 4 argument:
 # - The name of the target
 # - The list of object files to build in the cache directory
-# - An optional list of dependencies that will not be built in the cache directory
+# - An optional list of dependencies for linking, that will not be built
 # - An optional complementary recipe code, that will run after compilation and link
 
 
@@ -52,21 +57,21 @@ VERBOSE ?= $(V)
 $(VERBOSE).SILENT:
 
 # Directory where object files will be built
-CACHE_ROOT := cacheObjs
+CACHE_ROOT := cachedObjs
 
-# Header Dependency management
+# Dependency management
 DEPFLAGS = -MT $@ -MMD -MP -MF
 
 # Automatic determination of build artifacts cache directory, keyed on build
 # flags, so that we can do incremental, parallel builds of different binaries
 # with different build flags without collisions.
 
-UNAME ?= uname
-ifeq ($(shell $(UNAME)), Darwin)
+UNAME := $(shell uname)
+ifeq ($(UNAME), Darwin)
   HASH ?= md5
-else ifeq ($(shell $(UNAME)), FreeBSD)
+else ifeq ($(UNAME), FreeBSD)
   HASH ?= gmd5sum
-else ifeq ($(shell $(UNAME)), OpenBSD)
+else ifeq ($(UNAME), OpenBSD)
   HASH ?= md5
 endif
 HASH ?= md5sum
@@ -81,7 +86,7 @@ endif
 
 # OSX linker doen't support --whole-archive and --no-whole-archive, so we are using -force_load and
 # -load_hidden instead
-ifeq ($(shell $(UNAME)), Darwin)
+ifeq ($(UNAME), Darwin)
 	WHOLE_ARCHIVE = -force_load
 	NO_WHOLE_ARCHIVE = -load_hidden
 else
@@ -144,91 +149,38 @@ $$(CACHE_ROOT)/%/$(1) : $(1:.o=.cpp) $(2) | $$(CACHE_ROOT)/%/.
 
 endef # addTargetCxxObject
 
-define build_library  # targetName, targetDeps, addlDeps
+
+define program_base  # targetName, targetDeps, addlDeps, addRecipe, hashSuffix, compiler, flags
 ifeq ($$(V),2)
-$$(info $$(call build_library,$(1),$(2),$(3)))
-endif
-
-# We first build a `.partial.a` file that is based on the lib's direct dependancies
-# Those are also the dependencies that we will export
-.PRECIOUS: $$(CACHE_ROOT)/%/$(1).partial.a
-$$(CACHE_ROOT)/%/$(1).partial.a : $$(addprefix $$(CACHE_ROOT)/%/,$(2))
-	@echo AR $$@
-	$$(AR) $$(ARFLAGS) $$@ $$^
-	$$(RANLIB) $$@
-
-# After building the partial.a we turn it into a .o file
-# by partially linking with the external dependencies
-.PRECIOUS: $$(CACHE_ROOT)/%/$(1).o
-$$(CACHE_ROOT)/%/$(1).o : $$(CACHE_ROOT)/%/$(1).partial.a  $(3)
-	$$(CC) -r -nostdlib -o $$@ -Wl,$${WHOLE_ARCHIVE} $$< -Wl,$${NO_WHOLE_ARCHIVE} $$(wordlist 2,9999999,$$^)
-
-# Finally we turn the .o file into a static lib.a file
-.PRECIOUS: $$(CACHE_ROOT)/%/$(1)
-$$(CACHE_ROOT)/%/$(1) : $$(CACHE_ROOT)/%/$(1).o
-	@echo AR $$@
-	$$(AR) $$(ARFLAGS) $$@ $$^
-	$$(RANLIB) $$@
-
-endef # build_library
-
-
-SET_CACHE_DIRECTORY = \
-   +$$(MAKE) --no-print-directory $$@ \
-    CACHE_DIR=$$(CACHE_ROOT)/$$(call HASH_FUNC,$(1),$$(CC) $$(CXX) $$(CPPFLAGS) $$(CFLAGS) $$(CXXFLAGS) $$(LDFLAGS) $$(LDLIBS)) \
-    CPPFLAGS="$$(CPPFLAGS)" \
-    CFLAGS="$$(CFLAGS)" \
-	CXXFLAGS="$$(CXXFLAGS)" \
-    LDFLAGS="$$(LDFLAGS)" \
-    LDLIBS="$$(LDLIBS)"
-
-define build_c_program  # targetName, targetDeps, addlDeps, addlRecipe
-ifeq ($$(V),2)
-$$(info $$(call $(0),$(1),$(2),$(3)))
+$$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5),$(6),$(7)))
 endif
 
 ALL_PROGRAMS += $(1)
-
-ifndef CACHE_DIR
-.PHONY: $(1)  # must always be run
-$(1):
-	$(SET_CACHE_DIRECTORY)
-else
-
 $$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
 	@echo LINK $$@
-	$$(CC) $$(CPPFLAGS) $$(CFLAGS) $$^ -o $$@ $$(LDFLAGS) $$(LDLIBS)
+	$$($(6)) $$(CPPFLAGS) $$($(7)) $$^ -o $$@ $$(LDFLAGS) $$(LDLIBS)
 	$(4)
 
 .PHONY: $(1)
-$(1) : $$(CACHE_DIR)/$(1)
+$(1) : $$(CACHE_ROOT)/$$(call HASH_FUNC,$(1),$$($(6)) $$(CPPFLAGS) $$($(7)) $$(LDFLAGS) $$(LDLIBS)$(5))/$(1)
 	$$(LN) -sf $$< $$@
-endif # CACHE_DIR
-endef # build_c_program
+endef # program_base
 
+define c_program  # targetName, targetDeps, addlDeps, addRecipe
+$$(eval $$(call program_base,$(1),$(2),$(3),$(4),$(1),CC,CFLAGS))
+endef # c_program
 
-define build_cxx_program  # targetName, targetDeps, addlDeps
-ifeq ($$(V),2)
-$$(info $$(call $(0),$(1),$(2),$(3)))
-endif
+define c_program_shared_o  # targetName, targetDeps, addlDeps, addRecipe
+$$(eval $$(call program_base,$(1),$(2),$(3),$(4),,CC,CFLAGS))
+endef # c_program_shared_o
 
-ALL_PROGRAMS += $(1)
+define cxx_program  # targetName, targetDeps, addlDeps, addRecipe
+$$(eval $$(call program_base,$(1),$(2),$(3),$(4),$(1),CXX,CXXFLAGS))
+endef # cxx_program
 
-ifndef CACHE_DIR
-.PHONY: $(1)  # must always be run
-$(1):
-	$(SET_CACHE_DIRECTORY)
-else
-
-$$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
-	@echo LINK $$@
-	$$(CXX) $$(CPPFLAGS) $$(CXXFLAGS) $$^ -o $$@ $$(LDFLAGS) $$(LDLIBS)
-
-.PHONY: $(1)
-$(1) : $$(CACHE_DIR)/$(1)
-	$$(LN) -sf $$< $$@
-endif # CACHE_DIR
-endef # build_cxx_program
+define cxx_program_shared_o  # targetName, targetDeps, addlDeps, addRecipe
+$$(eval $$(call program_base,$(1),$(2),$(3),$(4),,CXX,CXXFLAGS))
+endef # cxx_program_shared_o
 
 
 # Create targets for individual object files
@@ -237,11 +189,11 @@ C_SRCS ?= $(notdir $(foreach dir,$(C_SRCDIRS),$(wildcard $(dir)/*.c)))
 ifneq ($(strip $(C_SRCDIRS)),)
 vpath %.c $(C_SRCDIRS)
 endif
-CXX_SRCS ?= $(notdir $(foreach dir,$(CXX_SRCDIRS),$(wildcard $(dir)/*.c)))
+CXX_SRCS ?= $(notdir $(foreach dir,$(CXX_SRCDIRS),$(wildcard $(dir)/*.cpp)))
 ifneq ($(strip $(CXX_SRCDIRS)),)
 vpath %.cpp $(CXX_SRCDIRS)
 endif
-ASM_SRCS ?= $(notdir $(foreach dir,$(ASM_SRCDIRS),$(wildcard $(dir)/*.c)))
+ASM_SRCS ?= $(notdir $(foreach dir,$(ASM_SRCDIRS),$(wildcard $(dir)/*.S)))
 ifneq ($(strip $(ASM_SRCDIRS)),)
 vpath %.S $(ASM_SRCDIRS)
 endif
@@ -253,3 +205,10 @@ ASM_OBJS ?= $(patsubst %.S,%.o,$(ASM_SRCS))
 $(foreach OBJ,$(C_OBJS),$(eval $(call addTargetObject,$(OBJ))))
 $(foreach OBJ,$(CXX_OBJS),$(eval $(call addTargetCxxObject,$(OBJ))))
 $(foreach OBJ,$(ASM_OBJS),$(eval $(call addTargetAsmObject,$(OBJ))))
+
+
+# Cleaning
+
+clean_cache:
+	$(RM) -rf $(CACHE_ROOT)
+	$(RM) $(ALL_PROGRAMS)
