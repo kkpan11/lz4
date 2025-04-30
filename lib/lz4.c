@@ -490,6 +490,7 @@ static const int      dec64table[8] = {0, 0, 0, -1, -4,  1, 2, 3};
 #  else
 #    define LZ4_FAST_DEC_LOOP 0
 #  endif
+#endif
 
 #if LZ4_FAST_DEC_LOOP
 
