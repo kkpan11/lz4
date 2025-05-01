@@ -53,7 +53,7 @@ USERCFLAGS:= -O3 $(CFLAGS) # -O3 can be overruled by user-provided -Ox level
 CFLAGS    = $(DEBUGFLAGS) $(USERCFLAGS)
 CPPFLAGS += -I$(LIBLZ4DIR) -DXXH_NAMESPACE=LZ4_
 
-include ../Makefile.inc
+include ../build/make/lz4defs.make
 
 OS_VERSION ?= $(UNAME) -r
 ifeq ($(TARGET_OS)$(shell $(OS_VERSION)),SunOS5.10)
@@ -66,7 +66,7 @@ ALLFLAGS  = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 default: lz4-release
 
 C_SRCDIRS = $(LIBLZ4DIR) .
-include ../multiconf.make
+include ../build/make/multiconf.make
 
 # thread detection
 NUM_SYMBOL   := \#

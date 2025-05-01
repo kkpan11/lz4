@@ -33,17 +33,17 @@
 #   OR
 #   C_OBJS, CXX_OBJS and ASM_OBJS variables defined
 #   *and* vpath set to find all source files
-# - directory `cacheObjs/` available to cache object files.
+# - directory `cachedObjs/` available to cache object files.
 #   alternatively, set CACHE_ROOT to some different value.
 # Optional:
 # - HASH can be set to a different custom hash program.
 
 # *_program*: generates a recipe for a target that will be built in a cache directory.
 # The cache directory is automatically derived from CACHE_ROOT and list of flags and compilers.
-# _shared_o variant is an optional optimization variant, that make it possible for multiple target to share the same objects.
+# *_shared_o* variant is an optional optimization variant, that make it possible for multiple targets to share the same objects.
 # However, as a consequence, all these objects must have exactly the same list of flags,
 # which in practice means that there must be no target-level modification (like: target: CFLAGS += someFlag).
-# In unsure, only use the standar variants, c_program and cxx_program.
+# If unsure, only use the standars variants, c_program and cxx_program.
 
 # All *_program* macro functions take up to 4 argument:
 # - The name of the target
@@ -66,7 +66,7 @@ DEPFLAGS = -MT $@ -MMD -MP -MF
 # flags, so that we can do incremental, parallel builds of different binaries
 # with different build flags without collisions.
 
-UNAME := $(shell uname)
+UNAME ?= $(shell uname)
 ifeq ($(UNAME), Darwin)
   HASH ?= md5
 else ifeq ($(UNAME), FreeBSD)

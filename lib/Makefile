@@ -57,7 +57,7 @@ ALLFLAGS = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 SRCFILES := $(sort $(wildcard *.c))
 OBJFILES = $(SRCFILES:.c=.o)
 
-include ../Makefile.inc
+include ../build/make/lz4defs.make
 
 # OS X linker doesn't support -soname, and use different extension
 # see : https://developer.apple.com/library/mac/documentation/DeveloperTools/Conceptual/DynamicLibraries/100-Articles/DynamicLibraryDesignGuidelines.html

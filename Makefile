@@ -36,7 +36,7 @@ TESTDIR = tests
 EXDIR   = examples
 FUZZDIR = ossfuzz
 
-include Makefile.inc
+include build/make/lz4defs.make
 
 MAKE += --no-print-directory
 

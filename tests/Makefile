@@ -43,12 +43,12 @@ CFLAGS    = $(WFLAGS) $(DEBUGFLAGS) $(USERCFLAGS)
 CPPFLAGS += -I$(LIBDIR) -I$(PRGDIR) -DXXH_NAMESPACE=LZ4_
 ALLFLAGS  = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 
-include ../Makefile.inc
+include ../build/make/lz4defs.make
 
 LZ4 := $(PRGDIR)/lz4$(EXT)
 
 C_SRCDIRS = $(LIBDIR) $(PRGDIR) .
-include ../multiconf.make
+include ../build/make/multiconf.make
 
 # Default test parameters
 TEST_FILES   := COPYING
