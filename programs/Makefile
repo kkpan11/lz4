@@ -31,8 +31,8 @@
 SED ?= sed
 
 # Version numbers
-LIBDIR   := ../lib
-LIBVER_SRC := $(LIBDIR)/lz4.h
+LIBLZ4DIR   := ../lib
+LIBVER_SRC := $(LIBLZ4DIR)/lz4.h
 LIBVER_MAJOR_SCRIPT:=`$(SED) -n '/define[[:blank:]][[:blank:]]*LZ4_VERSION_MAJOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LIBVER_SRC)`
 LIBVER_MINOR_SCRIPT:=`$(SED) -n '/define[[:blank:]][[:blank:]]*LZ4_VERSION_MINOR/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LIBVER_SRC)`
 LIBVER_PATCH_SCRIPT:=`$(SED) -n '/define[[:blank:]][[:blank:]]*LZ4_VERSION_RELEASE/s/.*[[:blank:]]\([0-9][0-9]*\).*/\1/p' < $(LIBVER_SRC)`
@@ -42,7 +42,7 @@ LIBVER_MINOR := $(shell echo $(LIBVER_MINOR_SCRIPT))
 LIBVER_PATCH := $(shell echo $(LIBVER_PATCH_SCRIPT))
 LIBVER   := $(shell echo $(LIBVER_SCRIPT))
 
-LIBFILES  = $(wildcard $(LIBDIR)/*.c)
+LIBFILES  = $(wildcard $(LIBLZ4DIR)/*.c)
 SRCFILES  = $(sort $(LIBFILES) $(wildcard *.c))
 OBJFILES  = $(SRCFILES:.c=.o)
 
@@ -51,7 +51,7 @@ DEBUGFLAGS= -Wall -Wextra -Wundef -Wcast-qual -Wcast-align -Wshadow \
             -Wpointer-arith -Wstrict-aliasing=1
 USERCFLAGS:= -O3 $(CFLAGS) # -O3 can be overruled by user-provided -Ox level
 CFLAGS    = $(DEBUGFLAGS) $(USERCFLAGS)
-CPPFLAGS += -I$(LIBDIR) -DXXH_NAMESPACE=LZ4_
+CPPFLAGS += -I$(LIBLZ4DIR) -DXXH_NAMESPACE=LZ4_
 
 include ../Makefile.inc
 
@@ -65,7 +65,7 @@ ALLFLAGS  = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 .PHONY:default
 default: lz4-release
 
-C_SRCDIRS = $(LIBDIR) .
+C_SRCDIRS = $(LIBLZ4DIR) .
 include ../multiconf.make
 
 # thread detection
@@ -133,8 +133,8 @@ $(eval $(call c_program,lz4-nomt,$(LZ4_OBJS)))
 
 CLEAN += lz4-wlib
 lz4-wlib: LIBFILES =
-lz4-wlib: SRCFILES+= $(LIBDIR)/xxhash.c  # benchmark unit needs XXH64()
-lz4-wlib: LDFLAGS += -L $(LIBDIR)
+lz4-wlib: SRCFILES+= $(LIBLZ4DIR)/xxhash.c  # benchmark unit needs XXH64()
+lz4-wlib: LDFLAGS += -L $(LIBLZ4DIR)
 lz4-wlib: LDLIBS   = -llz4
 lz4-wlib: liblz4 $(OBJFILES)
 	@echo WARNING: $@ must link to an extended variant of the dynamic library which also exposes unstable symbols
@@ -142,7 +142,7 @@ lz4-wlib: liblz4 $(OBJFILES)
 
 .PHONY:liblz4
 liblz4:
-	CPPFLAGS="-DLZ4F_PUBLISH_STATIC_FUNCTIONS -DLZ4_PUBLISH_STATIC_FUNCTIONS" $(MAKE) -C $(LIBDIR) liblz4
+	CPPFLAGS="-DLZ4F_PUBLISH_STATIC_FUNCTIONS -DLZ4_PUBLISH_STATIC_FUNCTIONS" $(MAKE) -C $(LIBLZ4DIR) liblz4
 
 CLEAN += lz4c
 lz4c: lz4
@@ -178,8 +178,9 @@ clean: clean_cache
 ifeq ($(WINBASED),yes)
 	$(RM) *.rc
 endif
-	$(MAKE) -C $(LIBDIR) $@ > $(VOID)
-	$(RM) $(CLEAN) *.o tmp* *.test core
+	$(MAKE) -C $(LIBLZ4DIR) $@ > $(VOID)
+	$(RM) $(CLEAN) *.o *.test core
+	$(RM) -r tmp*
 	@echo Cleaning completed
 
 

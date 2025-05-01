@@ -138,8 +138,8 @@ $(eval $(call c_program_shared_o,decompress-partial-usingDict,lz4.o decompress-p
 clean: clean_cache
 	@$(MAKE) -C $(LIBDIR) $@ > $(VOID)
 	@$(MAKE) -C $(PRGDIR) $@ > $(VOID)
-	@$(RM) $(CLEAN) core *.o *.test tmp*
-	@$(RM) -r $(VERSIONSTESTDIR)
+	@$(RM) $(CLEAN) core *.o *.test
+	@$(RM) -r $(VERSIONSTESTDIR) tmp*
 	@echo Cleaning completed
 
 .PHONY: versionsTest

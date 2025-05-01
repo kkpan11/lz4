@@ -165,6 +165,7 @@ ifeq ($(WINBASED),yes)
 endif
 	$(RM) $(CLEAN) core *.o *.a
 	$(RM) *.$(SHARED_EXT) *.$(SHARED_EXT_MAJOR) *.$(SHARED_EXT_VER)
+	$(RM) -r tmp*
 	@echo Cleaning library completed
 
 #-----------------------------------------------------------------------------
