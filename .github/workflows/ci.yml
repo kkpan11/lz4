@@ -212,8 +212,8 @@ jobs:
     steps:
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # https://github.com/actions/checkout v4.2.2
 
-    - name: make standard_variables
-      run: make standard_variables V=1
+    - name: check propagation of standard variables
+      run: make test_stdvars V=1
 
 
   lz4-versions:
