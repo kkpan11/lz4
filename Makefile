@@ -58,8 +58,6 @@ lib lib-release liblz4.a:
 	$(MAKE) -C $(LZ4DIR) $@
 
 .PHONY: lz4 lz4-release
-lz4 : liblz4.a
-lz4-release : lib-release
 lz4 lz4-release :
 	$(MAKE) -C $(PRGDIR) $@
 	$(LN_SF) $(PRGDIR)/lz4$(EXT) .
