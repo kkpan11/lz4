@@ -53,6 +53,7 @@ ld.exe*
 # test artifacts
 *.lz4
 tmp*
+.stdvars.log
 cmake_download/
 cmake_bins/
 cmake_build/
