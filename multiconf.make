@@ -163,8 +163,9 @@ $$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
 
 .PHONY: $(1)
 $(1) : $$(CACHE_ROOT)/$$(call HASH_FUNC,$(1),$$($(6)) $$(CPPFLAGS) $$($(7)) $$(LDFLAGS) $$(LDLIBS)$(5))/$(1)
-	$$(LN) -sf $$< $$@
+	$$(LN) -sf $$< $$@$(EXT)
 endef # program_base
+# Note: $(EXT) must be set to .exe for Windows
 
 define c_program  # targetName, targetDeps, addlDeps, addRecipe
 $$(eval $$(call program_base,$(1),$(2),$(3),$(4),$(1),CC,CFLAGS))

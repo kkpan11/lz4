@@ -243,7 +243,7 @@ c_standards_c11: clean
 .PHONY: test_stdvars
 test_stdvars:  ## CI helper – verifies CC/CFLAGS/CPPFLAGS/LDFLAGS/LDLIBS propagation
 	@echo '--- standard-variable propagation test ---'
-	@rm -f .stdvars.log
+	@$(RM) .stdvars.log
 
 	@$(MAKE) -rn V=1 \
 	    CC='cc -DCC_TEST' \
@@ -254,6 +254,6 @@ test_stdvars:  ## CI helper – verifies CC/CFLAGS/CPPFLAGS/LDFLAGS/LDLIBS propa
 	  | tee .stdvars.log >/dev/null
 
 	@tests/check_stdvars.sh .stdvars.log
-	@rm .stdvars.log
+	@$(RM) .stdvars.log
 
 endif   # MSYS POSIX

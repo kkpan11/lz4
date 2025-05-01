@@ -66,6 +66,7 @@ endif
 ifeq ($(WINBASED),yes)
 EXT        = .exe
 WINDRES ?= windres
+LDFLAGS += -Wl,--force-exe-suffix
 endif
 
 LIBLZ4      = $(LIBLZ4_NAME).$(SHARED_EXT_VER)
