@@ -258,13 +258,13 @@ standard_variables:
 	# supported in some part of the Makefile, and missed in others.
 	# So the test checks if they are present the _right nb of times_.
 	# However, checking static quantities makes this test brittle,
-	# because quantities (10, 2 and 1) can still evolve in future,
+	# because quantities (15, 2 and 1) can still evolve in future,
 	# for example when source directories or Makefile evolve.
-	if [ $$(grep CC_TEST tmpsv | wc -l) -ne 10 ]; then \
+	if [ $$(grep CC_TEST tmpsv | wc -l) -ne 15 ]; then \
 		echo "CC environment variable missed" && False; fi
-	if [ $$(grep CFLAGS_TEST tmpsv | wc -l) -ne 10 ]; then \
+	if [ $$(grep CFLAGS_TEST tmpsv | wc -l) -ne 15 ]; then \
 		echo "CFLAGS environment variable missed" && False; fi
-	if [ $$(grep CPPFLAGS_TEST tmpsv | wc -l) -ne 10 ]; then \
+	if [ $$(grep CPPFLAGS_TEST tmpsv | wc -l) -ne 15 ]; then \
 		echo "CPPFLAGS environment variable missed" && False; fi
 	if [ $$(grep LDFLAGS_TEST tmpsv | wc -l) -ne 2 ]; then \
 		echo "LDFLAGS environment variable missed" && False; fi
