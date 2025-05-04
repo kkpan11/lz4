@@ -36,8 +36,9 @@ TESTDIR = tests
 EXDIR   = examples
 FUZZDIR = ossfuzz
 
-include Makefile.inc
+include build/make/lz4defs.make
 
+MAKE += --no-print-directory
 
 .PHONY: default
 default: lib-release lz4-release
@@ -57,8 +58,6 @@ lib lib-release liblz4.a:
 	$(MAKE) -C $(LZ4DIR) $@
 
 .PHONY: lz4 lz4-release
-lz4 : liblz4.a
-lz4-release : lib-release
 lz4 lz4-release :
 	$(MAKE) -C $(PRGDIR) $@
 	$(LN_SF) $(PRGDIR)/lz4$(EXT) .
@@ -239,39 +238,20 @@ c_standards_c11: clean
 # The following test ensures that standard Makefile variables set through environment
 # are correctly transmitted at compilation stage.
 # This test is meant to detect issues like https://github.com/lz4/lz4/issues/958
-.PHONY: standard_variables
-standard_variables:
-	$(MAKE) clean
-	@echo =================
-	@echo Check support of Makefile Standard variables through environment
-	@echo note : this test requires V=1 to work properly
-	@echo =================
-	CC="cc -DCC_TEST" \
-	CFLAGS=-DCFLAGS_TEST \
-	CPPFLAGS=-DCPPFLAGS_TEST \
-	LDFLAGS=-DLDFLAGS_TEST \
-	LDLIBS=-DLDLIBS_TEST \
-	$(MAKE) V=1 > tmpsv
-	# Note: just checking the presence of custom flags
-	# would not detect situations where custom flags are
-	# supported in some part of the Makefile, and missed in others.
-	# So the test checks if they are present the _right nb of times_.
-	# However, checking static quantities makes this test brittle,
-	# because quantities (10, 2 and 1) can still evolve in future,
-	# for example when source directories or Makefile evolve.
-	if [ $$(grep CC_TEST tmpsv | wc -l) -ne 10 ]; then \
-		echo "CC environment variable missed" && False; fi
-	if [ $$(grep CFLAGS_TEST tmpsv | wc -l) -ne 10 ]; then \
-		echo "CFLAGS environment variable missed" && False; fi
-	if [ $$(grep CPPFLAGS_TEST tmpsv | wc -l) -ne 10 ]; then \
-		echo "CPPFLAGS environment variable missed" && False; fi
-	if [ $$(grep LDFLAGS_TEST tmpsv | wc -l) -ne 2 ]; then \
-		echo "LDFLAGS environment variable missed" && False; fi
-	if [ $$(grep LDLIBS_TEST tmpsv | wc -l) -ne 1 ]; then \
-		echo "LDLIBS environment variable missed" && False; fi
-	@echo =================
-	@echo all custom variables detected
-	@echo =================
-	$(RM) tmpsv
+.PHONY: test_stdvars
+test_stdvars:  ## CI helper – verifies CC/CFLAGS/CPPFLAGS/LDFLAGS/LDLIBS propagation
+	@echo '--- standard-variable propagation test ---'
+	@$(RM) .stdvars.log
+
+	@$(MAKE) -rn V=1 \
+	    CC='cc -DCC_TEST' \
+	    CFLAGS='-DCFLAGS_TEST' \
+	    CPPFLAGS='-DCPPFLAGS_TEST' \
+	    LDFLAGS='-DLDFLAGS_TEST' \
+	    LDLIBS='-DLDLIBS_TEST' \
+	  | tee .stdvars.log >/dev/null
+
+	@tests/check_stdvars.sh .stdvars.log
+	@$(RM) .stdvars.log
 
 endif   # MSYS POSIX

@@ -57,7 +57,7 @@ ALLFLAGS = $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
 SRCFILES := $(sort $(wildcard *.c))
 OBJFILES = $(SRCFILES:.c=.o)
 
-include ../Makefile.inc
+include ../build/make/lz4defs.make
 
 # OS X linker doesn't support -soname, and use different extension
 # see : https://developer.apple.com/library/mac/documentation/DeveloperTools/Conceptual/DynamicLibraries/100-Articles/DynamicLibraryDesignGuidelines.html
@@ -128,7 +128,7 @@ CLEAN += $(LIBLZ4_EXP)
 $(LIBLZ4): $(SRCFILES) liblz4-dll.o
   ifeq ($(BUILD_SHARED),yes)
 	@echo compiling dynamic library $(LIBVER)
-	$(CC) $(ALLFLAGS) -DLZ4_DLL_EXPORT=1 -shared $^ -o $@ -Wl,--out-implib,$(LIBLZ4_EXP)
+	$(CC) $(ALLFLAGS) -DLZ4_DLL_EXPORT=1 -shared $^ $(LDLIBS) -o $@ -Wl,--out-implib,$(LIBLZ4_EXP)
   endif
 
 else   # not windows
@@ -136,7 +136,7 @@ else   # not windows
 $(LIBLZ4): $(SRCFILES)
   ifeq ($(BUILD_SHARED),yes)
 	@echo compiling dynamic library $(LIBVER)
-	$(CC) $(ALLFLAGS) -shared $^ -fPIC -fvisibility=hidden $(SONAME_FLAGS) -o $@
+	$(CC) $(ALLFLAGS) -shared -fPIC $^ $(LDLIBS) -fvisibility=hidden $(SONAME_FLAGS) -o $@
 	@echo creating versioned links
 	$(LN_SF) $@ liblz4.$(SHARED_EXT_MAJOR)
 	$(LN_SF) $@ liblz4.$(SHARED_EXT)
@@ -165,6 +165,7 @@ ifeq ($(WINBASED),yes)
 endif
 	$(RM) $(CLEAN) core *.o *.a
 	$(RM) *.$(SHARED_EXT) *.$(SHARED_EXT_MAJOR) *.$(SHARED_EXT_VER)
+	$(RM) -r tmp*
 	@echo Cleaning library completed
 
 #-----------------------------------------------------------------------------

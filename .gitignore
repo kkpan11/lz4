@@ -1,6 +1,8 @@
 # Object files
 *.o
 *.ko
+obj/
+cacheObjs/
 
 # Libraries
 *.lib
@@ -22,6 +24,7 @@ lz4
 # Builders
 cmakebuild/
 builddir/
+cachedObjs/
 
 # IDE / editors files
 .clang_complete
@@ -50,6 +53,7 @@ ld.exe*
 # test artifacts
 *.lz4
 tmp*
+.stdvars.log
 cmake_download/
 cmake_bins/
 cmake_build/

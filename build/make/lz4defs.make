@@ -66,6 +66,7 @@ endif
 ifeq ($(WINBASED),yes)
 EXT        = .exe
 WINDRES ?= windres
+LDFLAGS += -Wl,--force-exe-suffix
 endif
 
 LIBLZ4      = $(LIBLZ4_NAME).$(SHARED_EXT_VER)
@@ -111,3 +112,4 @@ endif
 INSTALL_PROGRAM ?= $(INSTALL) -m 755
 INSTALL_DATA    ?= $(INSTALL) -m 644
 MAKE_DIR        ?= $(INSTALL) -d -m 755
+
