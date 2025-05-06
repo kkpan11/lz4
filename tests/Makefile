@@ -71,7 +71,7 @@ lz4:
 
 .PHONY: lib liblz4.pc
 lib liblz4.pc:
-	$(MAKE) -C $(LIBDIR) $@ CFLAGS="$(CFLAGS)"
+	CFLAGS="$(CFLAGS)" $(MAKE) -C $(LIBDIR) $@
 
 lz4c unlz4 lz4cat: lz4
 	$(LN_SF) $(LZ4) $(PRGDIR)/$@

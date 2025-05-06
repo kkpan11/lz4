@@ -218,7 +218,7 @@ $$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5),$(6),$(7)
 MCM_ALL_BINS += $(1)
 
 $$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
-	@echo LINK $$@
+	@echo LD $$@
 	$$($(6)) $$(CPPFLAGS) $$($(7)) $$^ -o $$@ $$(LDFLAGS) $$(LDLIBS)
 	$(4)
 
