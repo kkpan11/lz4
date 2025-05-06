@@ -53,7 +53,6 @@ all: allmost examples manuals build_tests
 allmost: lib lz4
 
 .PHONY: lib lib-release liblz4.a
-lib: liblz4.a
 lib lib-release liblz4.a:
 	$(MAKE) -C $(LZ4DIR) $@
 
@@ -195,7 +194,7 @@ ctocxxtest: LIBCC="$(CC)"
 ctocxxtest: EXECC="$(CXX) -Wno-deprecated"
 ctocxxtest: CFLAGS=-O0
 ctocxxtest:
-	CC=$(LIBCC) $(MAKE) -C $(LZ4DIR)  CFLAGS="$(CFLAGS)" all
+	CFLAGS="$(CFLAGS)" CC=$(LIBCC) $(MAKE) -C $(LZ4DIR)  all
 	CC=$(LIBCC) $(MAKE) -C $(TESTDIR) CFLAGS="$(CFLAGS)" lz4.o lz4hc.o lz4frame.o
 	CC=$(EXECC) $(MAKE) -C $(TESTDIR) CFLAGS="$(CFLAGS)" all
 
@@ -205,9 +204,9 @@ cxxtest cxx32test: CC := "$(CXX) -Wno-deprecated"
 cxxtest cxx32test: CFLAGS = -O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror
 cxxtest cxx32test:
 	$(CXX) -v
-	CC=$(CC) $(MAKE) -C $(LZ4DIR)  all CFLAGS="$(CFLAGS)"
-	CC=$(CC) $(MAKE) -C $(PRGDIR)  all CFLAGS="$(CFLAGS)"
-	CC=$(CC) $(MAKE) -C $(TESTDIR) all CFLAGS="$(CFLAGS)"
+	CC=$(CC) CFLAGS="$(CFLAGS)" $(MAKE) -C $(LZ4DIR)  all
+	CC=$(CC) CFLAGS="$(CFLAGS)" $(MAKE) -C $(PRGDIR)  all
+	CC=$(CC) CFLAGS="$(CFLAGS)" $(MAKE) -C $(TESTDIR) all
 
 .PHONY: cxx17build
 cxx17build : CC = "$(CXX) -Wno-deprecated"

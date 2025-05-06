@@ -90,10 +90,10 @@ MD2ROFF_FLAGS = --roff --warnings --manual="User Commands" --organization="lz4 $
 # silent mode by default; verbose can be triggered by V=1 or VERBOSE=1
 $(V)$(VERBOSE).SILENT:
 
-.PHONY:all
+.PHONY: all
 all: lz4 lz4-nomt lz4c unlz4 lz4cat
 
-.PHONY:all32
+.PHONY: all32
 all32: CFLAGS+=-m32
 all32: all
 

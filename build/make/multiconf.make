@@ -20,10 +20,12 @@
 #
 # ##########################################################################
 
-# Provides c_program(_shared_o) and cxx_program(_shared_o)
-# Provides V=1 / VERBOSE=1 support. V=2 is used for debugging purposes.
-# Provides target clean_cache: delete objects and binaries created with this script
+
+# Provides c_program(_shared_o) and cxx_program(_shared_o) target generation macros
+# Provides static_library and c_dynamic_library target generation macros
 # Support recompilation of only impacted units when an associated *.h is updated.
+# Provides V=1 / VERBOSE=1 support. V=2 is used for debugging purposes.
+# Complement target clean: delete objects and binaries created by this script
 
 # Requires:
 # - C_SRCDIRS, CXX_SRCDIRS, ASM_SRCDIRS defined
@@ -34,16 +36,16 @@
 #   C_OBJS, CXX_OBJS and ASM_OBJS variables defined
 #   *and* vpath set to find all source files
 # - directory `cachedObjs/` available to cache object files.
-#   alternatively, set CACHE_ROOT to some different value.
+#   alternatively: set CACHE_ROOT to some different value.
 # Optional:
 # - HASH can be set to a different custom hash program.
 
 # *_program*: generates a recipe for a target that will be built in a cache directory.
 # The cache directory is automatically derived from CACHE_ROOT and list of flags and compilers.
-# *_shared_o* variant is an optional optimization variant, that make it possible for multiple targets to share the same objects.
+# *_shared_o* variants are optional optimization variants, that share the same objects across multiple targets.
 # However, as a consequence, all these objects must have exactly the same list of flags,
 # which in practice means that there must be no target-level modification (like: target: CFLAGS += someFlag).
-# If unsure, only use the standars variants, c_program and cxx_program.
+# If unsure, only use the standard variants, c_program and cxx_program.
 
 # All *_program* macro functions take up to 4 argument:
 # - The name of the target
@@ -57,10 +59,18 @@ VERBOSE ?= $(V)
 $(VERBOSE).SILENT:
 
 # Directory where object files will be built
-CACHE_ROOT := cachedObjs
+CACHE_ROOT ?= cachedObjs
+
+# --------------------------------------------------------------------------------------------
 
 # Dependency management
 DEPFLAGS = -MT $@ -MMD -MP -MF
+
+# Include dependency files
+include $(wildcard $(CACHE_ROOT)/**/*.d)
+include $(wildcard $(CACHE_ROOT)/generic/*/*.d)
+
+# --------------------------------------------------------------------------------------------
 
 # Automatic determination of build artifacts cache directory, keyed on build
 # flags, so that we can do incremental, parallel builds of different binaries
@@ -84,20 +94,13 @@ else
   HASH_FUNC = $(firstword $(shell echo $(2) | $(HASH) ))
 endif
 
-# OSX linker doen't support --whole-archive and --no-whole-archive, so we are using -force_load and
-# -load_hidden instead
-ifeq ($(UNAME), Darwin)
-	WHOLE_ARCHIVE = -force_load
-	NO_WHOLE_ARCHIVE = -load_hidden
-else
-	WHOLE_ARCHIVE = --whole-archive
-	NO_WHOLE_ARCHIVE = --no-whole-archive
-endif
-
 
 MKDIR ?= mkdir
-RANLIB ?= ranlib
 LN ?= ln
+
+# --------------------------------------------------------------------------------------------
+# The following macros are used to create object files in the cache directory.
+# The object files are named after the source file, but with a different path.
 
 # Create build directories on-demand.
 #
@@ -109,26 +112,9 @@ LN ?= ln
 $(CACHE_ROOT)/%/. :
 	$(MKDIR) -p $@
 
-# Include dependency files
-include $(wildcard $(CACHE_ROOT)/**/*.d)
-include $(wildcard $(CACHE_ROOT)/generic/*/*.d)
-
-define addTargetObject  # targetName, addlDeps
-ifeq ($$(V),2)
-$$(info $$(call addTargetObject,$(1)))
-endif
-
-.PRECIOUS: $$(CACHE_ROOT)/%/$(1)
-$$(CACHE_ROOT)/%/$(1) : $(1:.o=.c) $(2) | $$(CACHE_ROOT)/%/.
-	@echo CC $$@
-	$$(CC) $$(CPPFLAGS) $$(CFLAGS) $$(DEPFLAGS) $$(CACHE_ROOT)/$$*/$(1:.o=.d) -c $$< -o $$@
-
-endef # addTargetObject
 
 define addTargetAsmObject  # targetName, addlDeps
-ifeq ($$(V),2)
-$$(info $$(call addTargetAsmObject,$(1)))
-endif
+$$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2))))
 
 .PRECIOUS: $$(CACHE_ROOT)/%/$(1)
 $$(CACHE_ROOT)/%/$(1) : $(1:.o=.S) $(2) | $$(CACHE_ROOT)/%/.
@@ -137,38 +123,114 @@ $$(CACHE_ROOT)/%/$(1) : $(1:.o=.S) $(2) | $$(CACHE_ROOT)/%/.
 
 endef # addTargetAsmObject
 
-define addTargetCxxObject  # targetName, addlDeps
-ifeq ($$(V),2)
-$$(info $$(call addTargetCxxObject,$(1)))
-endif
+define addTargetCObject  # targetName, addlDeps
+$$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2)))) #debug print
 
 .PRECIOUS: $$(CACHE_ROOT)/%/$(1)
-$$(CACHE_ROOT)/%/$(1) : $(1:.o=.cpp) $(2) | $$(CACHE_ROOT)/%/.
+$$(CACHE_ROOT)/%/$(1) : $(1:.o=.c) $(2) | $$(CACHE_ROOT)/%/.
+	@echo CC $$@
+	$$(CC) $$(CPPFLAGS) $$(CFLAGS) $$(DEPFLAGS) $$(CACHE_ROOT)/$$*/$(1:.o=.d) -c $$< -o $$@
+
+endef # addTargetCObject
+
+define addTargetCxxObject  # targetName, suffix, addlDeps
+$$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2),$(3))))
+
+.PRECIOUS: $$(CACHE_ROOT)/%/$(1)
+$$(CACHE_ROOT)/%/$(1) : $(1:.o=.$(2)) $(3) | $$(CACHE_ROOT)/%/.
 	@echo CXX $$@
 	$$(CXX) $$(CPPFLAGS) $$(CXXFLAGS) $$(DEPFLAGS) $$(CACHE_ROOT)/$$*/$(1:.o=.d) -c $$< -o $$@
 
 endef # addTargetCxxObject
 
+# Create targets for individual object files
+C_SRCDIRS += .
+vpath %.c $(C_SRCDIRS)
+CXX_SRCDIRS += .
+vpath %.cpp $(CXX_SRCDIRS)
+vpath %.cc $(CXX_SRCDIRS)
+ASM_SRCDIRS += .
+vpath %.S $(ASM_SRCDIRS)
 
-define program_base  # targetName, targetDeps, addlDeps, addRecipe, hashSuffix, compiler, flags
-ifeq ($$(V),2)
-$$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5),$(6),$(7)))
-endif
+# If C_SRCDIRS, CXX_SRCDIRS and ASM_SRCDIRS are not defined, use C_SRCS, CXX_SRCS and ASM_SRCS
+C_SRCS   ?= $(notdir $(foreach dir,$(C_SRCDIRS),$(wildcard $(dir)/*.c)))
+CPP_SRCS ?= $(notdir $(foreach dir,$(CXX_SRCDIRS),$(wildcard $(dir)/*.cpp)))
+CC_SRCS  ?= $(notdir $(foreach dir,$(CXX_SRCDIRS),$(wildcard $(dir)/*.cc)))
+CXX_SRCS ?= $(CPP_SRCS) $(CC_SRCS)
+ASM_SRCS ?= $(notdir $(foreach dir,$(ASM_SRCDIRS),$(wildcard $(dir)/*.S)))
 
-ALL_PROGRAMS += $(1)
+# If C_SRCS, CXX_SRCS and ASM_SRCS are not defined, use C_OBJS, CXX_OBJS and ASM_OBJS
+C_OBJS   ?= $(patsubst %.c,%.o,$(C_SRCS))
+CPP_OBJS ?= $(patsubst %.cpp,%.o,$(CPP_SRCS))
+CC_OBJS  ?= $(patsubst %.cc,%.o,$(CC_SRCS))
+CXX_OBJS ?= $(CPP_OBJS) $(CC_OBJS) # Note: not used
+ASM_OBJS ?= $(patsubst %.S,%.o,$(ASM_SRCS))
+
+$(foreach OBJ,$(C_OBJS),$(eval $(call addTargetCObject,$(OBJ))))
+$(foreach OBJ,$(CPP_OBJS),$(eval $(call addTargetCxxObject,$(OBJ),cpp)))
+$(foreach OBJ,$(CC_OBJS),$(eval $(call addTargetCxxObject,$(OBJ),cc)))
+$(foreach OBJ,$(ASM_OBJS),$(eval $(call addTargetAsmObject,$(OBJ))))
+
+# --------------------------------------------------------------------------------------------
+# The following macros are used to create targets in the user Makefile.
+# Binaries are built in the cache directory, and then symlinked to the current directory.
+# The cache directory is automatically derived from CACHE_ROOT and list of flags and compilers.
+
+define static_library  # targetName, targetDeps, addlDeps, addRecipe, hashComplement
+
+$$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5))))
+MCM_ALL_BINS += $(1)
+
 $$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
-	@echo LINK $$@
+	@echo AR $$@
+	$$(AR) $$(ARFLAGS) $$@ $$^
+	$(4)
+
+.PHONY: $(1)
+$(1) : ARFLAGS = rcs
+$(1) : $$(CACHE_ROOT)/$$(call HASH_FUNC,$(1),$(2) $$(CPPFLAGS) $$(CC) $$(CFLAGS) $$(CXX) $$(CXXFLAGS) $$(AR) $$(ARFLAGS) $(5))/$(1)
+	$$(LN) -sf $$< $$@
+
+endef # static_library
+
+
+define c_dynamic_library  # targetName, targetDeps, addlDeps, addRecipe, hashComplement
+
+$$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5))))
+MCM_ALL_BINS += $(1)
+
+$$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
+	@echo LD $$@
+	$$(CC) $$(CPPFLAGS) $$(CFLAGS) $$(LDFLAGS) -shared -o $$@ $$^ $$(LDLIBS)
+	$(4)
+
+.PHONY: $(1)
+$(1) : CFLAGS += -fPIC
+$(1) : $$(CACHE_ROOT)/$$(call HASH_FUNC,$(1),$(2) $$(CPPFLAGS) $$(CC) $$(CFLAGS) $$(LDFLAGS) $$(LDLIBS) $(5))/$(1)
+	$$(LN) -sf $$< $$@
+
+endef # c_dynamic_library
+
+
+define program_base  # targetName, targetDeps, addlDeps, addRecipe, hashComplement, compiler, flags
+
+$$(if $$(filter 2,$$(V)),$$(info $$(call $(0),$(1),$(2),$(3),$(4),$(5),$(6),$(7))))
+MCM_ALL_BINS += $(1)
+
+$$(CACHE_ROOT)/%/$(1) : $$(addprefix $$(CACHE_ROOT)/%/,$(2)) $(3)
+	@echo LD $$@
 	$$($(6)) $$(CPPFLAGS) $$($(7)) $$^ -o $$@ $$(LDFLAGS) $$(LDLIBS)
 	$(4)
 
 .PHONY: $(1)
-$(1) : $$(CACHE_ROOT)/$$(call HASH_FUNC,$(1),$$($(6)) $$(CPPFLAGS) $$($(7)) $$(LDFLAGS) $$(LDLIBS)$(5))/$(1)
+$(1) : $$(CACHE_ROOT)/$$(call HASH_FUNC,$(1),$$($(6)) $$(CPPFLAGS) $$($(7)) $$(LDFLAGS) $$(LDLIBS) $(5))/$(1)
 	$$(LN) -sf $$< $$@$(EXT)
+
 endef # program_base
 # Note: $(EXT) must be set to .exe for Windows
 
 define c_program  # targetName, targetDeps, addlDeps, addRecipe
-$$(eval $$(call program_base,$(1),$(2),$(3),$(4),$(1),CC,CFLAGS))
+$$(eval $$(call program_base,$(1),$(2),$(3),$(4),$(1)$(2),CC,CFLAGS))
 endef # c_program
 
 define c_program_shared_o  # targetName, targetDeps, addlDeps, addRecipe
@@ -176,40 +238,21 @@ $$(eval $$(call program_base,$(1),$(2),$(3),$(4),,CC,CFLAGS))
 endef # c_program_shared_o
 
 define cxx_program  # targetName, targetDeps, addlDeps, addRecipe
-$$(eval $$(call program_base,$(1),$(2),$(3),$(4),$(1),CXX,CXXFLAGS))
+$$(eval $$(call program_base,$(1),$(2),$(3),$(4),$(1)$(2),CXX,CXXFLAGS))
 endef # cxx_program
 
 define cxx_program_shared_o  # targetName, targetDeps, addlDeps, addRecipe
 $$(eval $$(call program_base,$(1),$(2),$(3),$(4),,CXX,CXXFLAGS))
 endef # cxx_program_shared_o
 
+# --------------------------------------------------------------------------------------------
 
-# Create targets for individual object files
-
-C_SRCS ?= $(notdir $(foreach dir,$(C_SRCDIRS),$(wildcard $(dir)/*.c)))
-ifneq ($(strip $(C_SRCDIRS)),)
-vpath %.c $(C_SRCDIRS)
-endif
-CXX_SRCS ?= $(notdir $(foreach dir,$(CXX_SRCDIRS),$(wildcard $(dir)/*.cpp)))
-ifneq ($(strip $(CXX_SRCDIRS)),)
-vpath %.cpp $(CXX_SRCDIRS)
-endif
-ASM_SRCS ?= $(notdir $(foreach dir,$(ASM_SRCDIRS),$(wildcard $(dir)/*.S)))
-ifneq ($(strip $(ASM_SRCDIRS)),)
-vpath %.S $(ASM_SRCDIRS)
-endif
-
-C_OBJS  ?= $(patsubst %.c,%.o,$(C_SRCS))
-CXX_OBJS ?= $(patsubst %.cpp,%.o,$(CXX_SRCS))
-ASM_OBJS ?= $(patsubst %.S,%.o,$(ASM_SRCS))
-
-$(foreach OBJ,$(C_OBJS),$(eval $(call addTargetObject,$(OBJ))))
-$(foreach OBJ,$(CXX_OBJS),$(eval $(call addTargetCxxObject,$(OBJ))))
-$(foreach OBJ,$(ASM_OBJS),$(eval $(call addTargetAsmObject,$(OBJ))))
-
-
-# Cleaning
-
+# Cleaning: delete all objects and binaries created with this script
+.PHONY: clean_cache
 clean_cache:
 	$(RM) -rf $(CACHE_ROOT)
-	$(RM) $(ALL_PROGRAMS)
+	$(RM) $(MCM_ALL_BINS)
+
+# automatically attach to standard clean target
+.PHONY: clean
+clean: clean_cache
