@@ -53,7 +53,6 @@ all: allmost examples manuals build_tests
 allmost: lib lz4
 
 .PHONY: lib lib-release liblz4.a
-lib: liblz4.a
 lib lib-release liblz4.a:
 	$(MAKE) -C $(LZ4DIR) $@
 

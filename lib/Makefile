@@ -106,7 +106,9 @@ all32: CFLAGS+=-m32
 all32: all
 
 liblz4.a:
+ifeq ($(BUILD_STATIC),yes)
 $(eval $(call static_library,liblz4.a,$(OBJFILES)))
+endif
 
 ifeq ($(WINBASED),yes)
 
@@ -122,7 +124,7 @@ liblz4-dll.rc: liblz4-dll.rc.in
 liblz4-dll.o: liblz4-dll.rc
 	$(WINDRES) -i liblz4-dll.rc -o liblz4-dll.o
 
-CLEAN += $(LIBLZ4_EXP)
+CLEAN += $(LIBLZ4) $(LIBLZ4_EXP)
 $(LIBLZ4): $(SRCFILES) liblz4-dll.o
   ifeq ($(BUILD_SHARED),yes)
 	@echo compiling dynamic library $(LIBVER)
@@ -131,20 +133,21 @@ $(LIBLZ4): $(SRCFILES) liblz4-dll.o
 
 else   # not windows
 
-$(LIBLZ4): $(SRCFILES)
-  ifeq ($(BUILD_SHARED),yes)
-	@echo compiling dynamic library $(LIBVER)
-	$(CC) $(ALLFLAGS) -shared -fPIC $^ $(LDLIBS) -fvisibility=hidden $(SONAME_FLAGS) -o $@
-	@echo creating versioned links
-	$(LN_SF) $@ liblz4.$(SHARED_EXT_MAJOR)
-	$(LN_SF) $@ liblz4.$(SHARED_EXT)
-  endif
+$(LIBLZ4): LDFLAGS += -fvisibility=hidden $(SONAME_FLAGS)
+ifeq ($(BUILD_SHARED),yes)
+$(eval $(call c_dynamic_library,$(LIBLZ4),$(OBJFILES),,echo "$(LIBLZ4) created"))
+endif
 
 endif
-CLEAN += $(LIBLZ4)
+
+liblz4.$(SHARED_EXT_MAJOR): $(LIBLZ4)
+	$(LN_SF) $< $@
+
+liblz4.$(SHARED_EXT): liblz4.$(SHARED_EXT_MAJOR)
+	$(LN_SF) $< $@
 
 .PHONY: liblz4
-liblz4: $(LIBLZ4)
+liblz4: $(LIBLZ4) liblz4.$(SHARED_EXT_MAJOR) liblz4.$(SHARED_EXT)
 
 CLEAN += liblz4.pc
 liblz4.pc: liblz4.pc.in Makefile
