@@ -59,6 +59,12 @@ OBJFILES = $(SRCFILES:.c=.o)
 
 include ../build/make/lz4defs.make
 
+# default is defined as the first target in Makefile, hence before multiconf.make
+.PHONY: default
+default: lib-release
+
+include ../build/make/multiconf.make
+
 # OS X linker doesn't support -soname, and use different extension
 # see : https://developer.apple.com/library/mac/documentation/DeveloperTools/Conceptual/DynamicLibraries/100-Articles/DynamicLibraryDesignGuidelines.html
 ifeq ($(TARGET_OS), Darwin)
@@ -82,9 +88,6 @@ ifeq ($(TARGET_OS), AIX)
 endif
 endif
 
-.PHONY: default
-default: lib-release
-
 # silent mode by default; verbose can be triggered by V=1 or VERBOSE=1
 $(V)$(VERBOSE).SILENT:
 
@@ -102,13 +105,8 @@ all: lib liblz4.pc
 all32: CFLAGS+=-m32
 all32: all
 
-CLEAN += liblz4.a
-liblz4.a: $(SRCFILES)
-ifeq ($(BUILD_STATIC),yes)  # can be disabled on command line
-	@echo compiling static library
-	$(COMPILE.c) $^
-	$(AR) rcs $@ $(OBJFILES)
-endif
+liblz4.a:
+$(eval $(call static_library,liblz4.a,$(OBJFILES)))
 
 ifeq ($(WINBASED),yes)
 
@@ -160,9 +158,7 @@ liblz4.pc: liblz4.pc.in Makefile
 
 .PHONY: clean
 clean:
-ifeq ($(WINBASED),yes)
 	$(RM) *.rc
-endif
 	$(RM) $(CLEAN) core *.o *.a
 	$(RM) *.$(SHARED_EXT) *.$(SHARED_EXT_MAJOR) *.$(SHARED_EXT_VER)
 	$(RM) -r tmp*
