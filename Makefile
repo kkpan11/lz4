@@ -194,7 +194,7 @@ ctocxxtest: LIBCC="$(CC)"
 ctocxxtest: EXECC="$(CXX) -Wno-deprecated"
 ctocxxtest: CFLAGS=-O0
 ctocxxtest:
-	CC=$(LIBCC) $(MAKE) -C $(LZ4DIR)  CFLAGS="$(CFLAGS)" all
+	CFLAGS="$(CFLAGS)" CC=$(LIBCC) $(MAKE) -C $(LZ4DIR)  all
 	CC=$(LIBCC) $(MAKE) -C $(TESTDIR) CFLAGS="$(CFLAGS)" lz4.o lz4hc.o lz4frame.o
 	CC=$(EXECC) $(MAKE) -C $(TESTDIR) CFLAGS="$(CFLAGS)" all
 
