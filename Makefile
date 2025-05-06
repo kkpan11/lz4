@@ -204,9 +204,9 @@ cxxtest cxx32test: CC := "$(CXX) -Wno-deprecated"
 cxxtest cxx32test: CFLAGS = -O3 -Wall -Wextra -Wundef -Wshadow -Wcast-align -Werror
 cxxtest cxx32test:
 	$(CXX) -v
-	CC=$(CC) $(MAKE) -C $(LZ4DIR)  all CFLAGS="$(CFLAGS)"
-	CC=$(CC) $(MAKE) -C $(PRGDIR)  all CFLAGS="$(CFLAGS)"
-	CC=$(CC) $(MAKE) -C $(TESTDIR) all CFLAGS="$(CFLAGS)"
+	CC=$(CC) CFLAGS="$(CFLAGS)" $(MAKE) -C $(LZ4DIR)  all
+	CC=$(CC) CFLAGS="$(CFLAGS)" $(MAKE) -C $(PRGDIR)  all
+	CC=$(CC) CFLAGS="$(CFLAGS)" $(MAKE) -C $(TESTDIR) all
 
 .PHONY: cxx17build
 cxx17build : CC = "$(CXX) -Wno-deprecated"
