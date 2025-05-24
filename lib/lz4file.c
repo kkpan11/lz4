@@ -153,45 +153,46 @@ LZ4F_errorCode_t LZ4F_readOpen(LZ4_readFile_t** lz4fRead, FILE* fp)
 
 size_t LZ4F_read(LZ4_readFile_t* lz4fRead, void* buf, size_t size)
 {
-  LZ4_byte* p = (LZ4_byte*)buf;
-  size_t next = 0;
+  LZ4_byte* outPtr = (LZ4_byte*)buf;
+  size_t totalBytesRead = 0;
 
   if (lz4fRead == NULL || buf == NULL)
     RETURN_ERROR(parameter_null);
 
-  while (next < size) {
-    size_t srcsize = lz4fRead->srcBufSize - lz4fRead->srcBufNext;
-    size_t dstsize = size - next;
-    size_t ret;
+  while (totalBytesRead < size) {
+    size_t srcBytes = lz4fRead->srcBufSize - lz4fRead->srcBufNext;
+    size_t dstBytes = size - totalBytesRead;
 
-    if (srcsize == 0) {
-      ret = fread(lz4fRead->srcBuf, 1, lz4fRead->srcBufMaxSize, lz4fRead->fp);
-      if (ret > 0) {
-        lz4fRead->srcBufSize = ret;
-        srcsize = lz4fRead->srcBufSize;
-        lz4fRead->srcBufNext = 0;
-      } else if (ret == 0) {
-        break;
-      } else {
-        RETURN_ERROR(io_read);
+    if (srcBytes == 0) {
+      size_t const bytesRead = fread(lz4fRead->srcBuf, 1, lz4fRead->srcBufMaxSize, lz4fRead->fp);
+      if (bytesRead == 0) {
+        if (ferror(lz4fRead->fp)) {
+          RETURN_ERROR(io_read);
+        }
+        break; /* end of input reached */
       }
+      /* success: ret > 0*/
+      lz4fRead->srcBufSize = bytesRead;
+      srcBytes = lz4fRead->srcBufSize;
+      lz4fRead->srcBufNext = 0;
     }
 
-    ret = LZ4F_decompress(lz4fRead->dctxPtr,
-                          p, &dstsize,
+    { size_t const decStatus = LZ4F_decompress(
+                          lz4fRead->dctxPtr,
+                          outPtr, &dstBytes,
                           lz4fRead->srcBuf + lz4fRead->srcBufNext,
-                          &srcsize,
+                          &srcBytes,
                           NULL);
-    if (LZ4F_isError(ret)) {
-        return ret;
-    }
+      if (LZ4F_isError(decStatus)) {
+          return decStatus;
+    } }
 
-    lz4fRead->srcBufNext += srcsize;
-    next += dstsize;
-    p += dstsize;
+    lz4fRead->srcBufNext += srcBytes;
+    totalBytesRead += dstBytes;
+    outPtr += dstBytes;
   }
 
-  return next;
+  return totalBytesRead;
 }
 
 LZ4F_errorCode_t LZ4F_readClose(LZ4_readFile_t* lz4fRead)
