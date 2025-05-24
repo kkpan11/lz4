@@ -37,14 +37,16 @@
 #include "lz4.h"
 #include "lz4file.h"
 
+/* =====   Error Handling   ===== */
 static LZ4F_errorCode_t returnErrorCode(LZ4F_errorCodes code)
 {
     return (LZ4F_errorCode_t)-(ptrdiff_t)code;
 }
+
 #undef RETURN_ERROR
 #define RETURN_ERROR(e) return returnErrorCode(LZ4F_ERROR_ ## e)
 
-/* =====   read API   ===== */
+/* =====    Read API Implementation    ===== */
 
 struct LZ4_readFile_s {
   LZ4F_dctx* dctxPtr;
@@ -63,78 +65,90 @@ static void LZ4F_freeReadFile(LZ4_readFile_t* lz4fRead)
   free(lz4fRead);
 }
 
-static void LZ4F_freeAndNullReadFile(LZ4_readFile_t** statePtr)
+static void freeAndNullReadFile(LZ4_readFile_t** statePtr)
 {
   assert(statePtr != NULL);
   LZ4F_freeReadFile(*statePtr);
   *statePtr = NULL;
 }
 
+static LZ4F_errorCode_t readAndParseHeader(LZ4_readFile_t* readFile, FILE* fp)
+{
+    char headerBuf[LZ4F_HEADER_SIZE_MAX];
+    LZ4F_frameInfo_t frameInfo;
+    size_t consumedSize;
+
+    /* Read the header from file */
+    const size_t bytesRead = fread(headerBuf, 1, sizeof(headerBuf), fp);
+    if (bytesRead < LZ4F_HEADER_SIZE_MIN + LZ4F_ENDMARK_SIZE) {
+        RETURN_ERROR(io_read);
+    }
+
+    /* Parse frame information */
+    consumedSize = bytesRead;
+    { const LZ4F_errorCode_t result = LZ4F_getFrameInfo(readFile->dctxPtr, &frameInfo, headerBuf, &consumedSize);
+      if (LZ4F_isError(result)) {
+          return result;
+    } }
+
+    /* Determine buffer size based on block size */
+    { const size_t blockSize = LZ4F_getBlockSize(frameInfo.blockSizeID);
+      if (blockSize == 0) {
+          RETURN_ERROR(maxBlockSize_invalid);
+      }
+      readFile->srcBufMaxSize = blockSize;
+    }
+
+    /* Allocate source buffer */
+    assert(readFile->srcBuf == NULL); /* Should be NULL from calloc */
+    readFile->srcBuf = (LZ4_byte*)malloc(readFile->srcBufMaxSize);
+    if (readFile->srcBuf == NULL) {
+        RETURN_ERROR(allocation_failed);
+    }
+
+    /* Store remaining header data in buffer */
+    readFile->srcBufSize = bytesRead - consumedSize;
+    if (readFile->srcBufSize > 0) {
+        memcpy(readFile->srcBuf, headerBuf + consumedSize, readFile->srcBufSize);
+    }
+    readFile->srcBufNext = 0;
+
+    return LZ4F_OK_NoError;
+}
+
 LZ4F_errorCode_t LZ4F_readOpen(LZ4_readFile_t** lz4fRead, FILE* fp)
 {
-  char buf[LZ4F_HEADER_SIZE_MAX];
-  size_t consumedSize;
-  LZ4F_errorCode_t ret;
+    LZ4_readFile_t* readFile;
 
-  if (fp == NULL || lz4fRead == NULL) {
-    RETURN_ERROR(parameter_null);
-  }
-
-  *lz4fRead = (LZ4_readFile_t*)calloc(1, sizeof(LZ4_readFile_t));
-  if (*lz4fRead == NULL) {
-    RETURN_ERROR(allocation_failed);
-  }
-
-  ret = LZ4F_createDecompressionContext(&(*lz4fRead)->dctxPtr, LZ4F_VERSION);
-  if (LZ4F_isError(ret)) {
-    LZ4F_freeAndNullReadFile(lz4fRead);
-    return ret;
-  }
-
-  (*lz4fRead)->fp = fp;
-  consumedSize = fread(buf, 1, sizeof(buf), (*lz4fRead)->fp);
-  if (consumedSize < LZ4F_HEADER_SIZE_MIN + LZ4F_ENDMARK_SIZE) {
-    LZ4F_freeAndNullReadFile(lz4fRead);
-    RETURN_ERROR(io_read);
-  }
-
-  { LZ4F_frameInfo_t info;
-    LZ4F_errorCode_t const r = LZ4F_getFrameInfo((*lz4fRead)->dctxPtr, &info, buf, &consumedSize);
-    if (LZ4F_isError(r)) {
-      LZ4F_freeAndNullReadFile(lz4fRead);
-      return r;
+    /* Validate parameters */
+    if (fp == NULL || lz4fRead == NULL) {
+        RETURN_ERROR(parameter_null);
     }
 
-    switch (info.blockSizeID) {
-      case LZ4F_default :
-      case LZ4F_max64KB :
-        (*lz4fRead)->srcBufMaxSize = 64 * 1024;
-        break;
-      case LZ4F_max256KB:
-        (*lz4fRead)->srcBufMaxSize = 256 * 1024;
-        break;
-      case LZ4F_max1MB:
-        (*lz4fRead)->srcBufMaxSize = 1 * 1024 * 1024;
-        break;
-      case LZ4F_max4MB:
-        (*lz4fRead)->srcBufMaxSize = 4 * 1024 * 1024;
-        break;
-      default:
-        LZ4F_freeAndNullReadFile(lz4fRead);
-        RETURN_ERROR(maxBlockSize_invalid);
+    /* Allocate read file structure */
+    readFile = (LZ4_readFile_t*)calloc(1, sizeof(LZ4_readFile_t));
+    if (readFile == NULL) {
+        RETURN_ERROR(allocation_failed);
     }
-  }
 
-  (*lz4fRead)->srcBuf = (LZ4_byte*)malloc((*lz4fRead)->srcBufMaxSize);
-  if ((*lz4fRead)->srcBuf == NULL) {
-    LZ4F_freeAndNullReadFile(lz4fRead);
-    RETURN_ERROR(allocation_failed);
-  }
+    readFile->fp = fp;
 
-  (*lz4fRead)->srcBufSize = sizeof(buf) - consumedSize;
-  memcpy((*lz4fRead)->srcBuf, buf + consumedSize, (*lz4fRead)->srcBufSize);
+    /* Initialize decompression context */
+    { LZ4F_errorCode_t const result = LZ4F_createDecompressionContext(&readFile->dctxPtr, LZ4F_VERSION);
+      if (LZ4F_isError(result)) {
+          freeAndNullReadFile(&readFile);
+          return result;
+    } }
 
-  return ret;
+    /* Read and parse the header */
+    { LZ4F_errorCode_t const result = readAndParseHeader(readFile, fp);
+      if (LZ4F_isError(result)) {
+          freeAndNullReadFile(&readFile);
+          return result;
+    } }
+
+    *lz4fRead = readFile;
+    return LZ4F_OK_NoError;
 }
 
 size_t LZ4F_read(LZ4_readFile_t* lz4fRead, void* buf, size_t size)

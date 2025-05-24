@@ -45,10 +45,19 @@ extern "C" {
 typedef struct LZ4_readFile_s LZ4_readFile_t;
 typedef struct LZ4_writeFile_s LZ4_writeFile_t;
 
-/*! LZ4F_readOpen() :
- * Set read lz4file handle.
- * `lz4f` will set a lz4file handle.
- * `fp` must be the return value of the lz4 file opened by fopen.
+/**
+ * Opens an LZ4 file for reading.
+ * Note that the FILE* handle @p fp must be opened in binary mode.
+ *
+ * @param lz4fRead  Pointer to receive the read file handle.
+ *                  It is an OUT parameter, so its initial value is ignored and will be overwritten.
+ *                  Its value on exit is only valid if the function returns LZ4F_OK_NoError.
+ * @param fp        FILE* positioned at start of LZ4 file (binary mode).
+ *
+ * @return LZ4F_OK_NoError on success, or error code on failure.
+ *         Can be tested with LZ4F_isError().
+ *
+ * @note Must be closed with LZ4F_readClose() when done.
  */
 LZ4FLIB_STATIC_API LZ4F_errorCode_t LZ4F_readOpen(LZ4_readFile_t** lz4fRead, FILE* fp);
 
