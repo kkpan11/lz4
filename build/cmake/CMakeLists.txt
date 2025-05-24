@@ -294,6 +294,7 @@ if(NOT LZ4_BUNDLED_MODE)
       add_custom_target("create_${cli_tool}_symlink" ALL
         COMMAND ${CMAKE_COMMAND} -E create_symlink
           $<TARGET_FILE_NAME:lz4cli> ${cli_tool}
+        DEPENDS lz4cli
         COMMENT "Creating symlink for ${cli_tool}"
         VERBATIM)
 
