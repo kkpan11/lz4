@@ -34,6 +34,17 @@ message(STATUS "Creating build script for LZ4 version: ${LZ4_VERSION_STRING}")
 
 project(LZ4 VERSION ${LZ4_VERSION_STRING} LANGUAGES C)
 
+#-----------------------------------------------------------------------------
+# DEFAULT BUILD TYPE - Set Release as default when no build type is specified
+#-----------------------------------------------------------------------------
+# Set a default build type if none was specified
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  message(STATUS "Setting build type to 'Release' as none was specified.")
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
+  # Set the possible values of build type for cmake-gui
+  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
+    "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
 
 #-----------------------------------------------------------------------------
 # BUILD OPTIONS - Configure build targets and features
