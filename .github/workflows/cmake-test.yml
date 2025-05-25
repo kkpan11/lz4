@@ -184,8 +184,18 @@ jobs:
         cd build-${{ matrix.build_type }}
         
         # Check that expected files are installed
-        if [[ -f "install-test/lib/liblz4*" || -f "install-test/lib/lz4*" ]]; then
-          echo "✓ Library files installed"
+        echo look at install-test
+        ls install-test
+        echo look at install-test/lib
+        ls install-test/lib
+
+        # Check for library files using proper glob expansion
+        shopt -s nullglob  # Make globs expand to nothing if no matches
+        lib_files=(install-test/lib/liblz4* install-test/lib/lz4*)
+        shopt -u nullglob
+
+        if [[ ${#lib_files[@]} -gt 0 ]]; then
+          echo "✓ Library files installed: ${lib_files[*]}"
         else
           echo "ERROR: Library files not found in installation"
           ls -la install-test/lib/ || true
