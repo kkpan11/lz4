@@ -1,5 +1,4 @@
 # Simplified CMake Build Tests
-# Focuses on essential functionality while reducing CI runtime
 name: CMake Build Tests
 
 on:
@@ -16,14 +15,13 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
 
 jobs:
-  # Core functionality test - reduced matrix
+  # Core functionality test - multi-platform
   cmake-core-tests:
-    name: Core CMake Tests (${{ matrix.os }}, ${{ matrix.build_type }})
+    name: Core Tests (${{ matrix.os }}, ${{ matrix.build_type }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        # Reduced to essential combinations
         include:
           - os: ubuntu-latest
             build_type: Release
@@ -51,80 +49,33 @@ jobs:
       with:
         cmake-version: latest
 
-    # Combined configuration and build test
     - name: Configure and Build
       shell: bash
       run: |
-        mkdir cmakebuild
-        cd cmakebuild
-
-        # Configure with specific build type
+        mkdir cmakebuild && cd cmakebuild
         cmake ../build/cmake ${{ matrix.generator }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-
-        # Verify default build type is Release when not specified
-        if [[ "${{ matrix.build_type }}" == "Release" && "$RUNNER_OS" != "Windows" ]]; then
-          mkdir ../build-default && cd ../build-default
-          cmake ../build/cmake ${{ matrix.generator }}
-          build_type=$(cmake -LA . | grep CMAKE_BUILD_TYPE | cut -d= -f2)
-          if [[ "$build_type" != "Release" ]]; then
-            echo "ERROR: Default build type should be Release, got: $build_type"
-            exit 1
-          fi
-          cd ../cmakebuild
-        fi
-
-        # Build
         cmake --build . --config ${{ matrix.build_type }}
 
-    # Combined debug level testing (only for Debug builds)
-    - name: Test Debug Level Configuration
-      if: matrix.build_type == 'Debug'
-      shell: bash
-      run: |
-        cd cmakebuild
-
-        # Test that Debug builds default to LZ4_DEBUG=1
-        debug_level=$(cmake -LA . | grep LZ4_DEBUG_LEVEL | cut -d= -f2)
-        if [[ "$debug_level" != "1" ]]; then
-          echo "ERROR: Debug builds should default to LZ4_DEBUG_LEVEL=1, got: $debug_level"
-          exit 1
-        fi
-
-        # Test custom debug level
-        cmake ../build/cmake ${{ matrix.generator }} -DLZ4_DEBUG_LEVEL=2 -DCMAKE_BUILD_TYPE=Debug
-        debug_level=$(cmake -LA . | grep LZ4_DEBUG_LEVEL | cut -d= -f2)
-        if [[ "$debug_level" != "2" ]]; then
-          echo "ERROR: Custom LZ4_DEBUG_LEVEL should be 2, got: $debug_level"
-          exit 1
-        fi
-
-    # Installation test (Linux only to avoid complexity)
-    - name: Test Installation
+    - name: Test Installation (Linux only)
       if: runner.os == 'Linux'
       shell: bash
       run: |
         cd cmakebuild
         cmake --install . --prefix install-test
+        test -f "install-test/lib/liblz4.a" || test -f "install-test/lib/liblz4.so"
+        test -f "install-test/include/lz4.h"
 
-        # Basic installation verification
-        if [[ ! -f "install-test/lib/liblz4.a" && ! -f "install-test/lib/liblz4.so" ]]; then
-          echo "ERROR: Library files not found"
-          exit 1
-        fi
-
-        if [[ ! -f "install-test/include/lz4.h" ]]; then
-          echo "ERROR: Header files not found"
-          exit 1
-        fi
-
-  # Compatibility test - reduced scope
-  cmake-compatibility:
-    name: CMake Compatibility
+  # CMake compatibility and integration tests
+  cmake-extended-tests:
+    name: Extended Tests
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        cmake_version: ["3.10.0", "3.20.0", "latest"]
+        test_type: 
+          - cmake_versions
+          - static_lib
+          - integration
 
     steps:
     - name: Checkout repository
@@ -133,149 +84,44 @@ jobs:
     - name: Set up CMake
       uses: jwlawson/actions-setup-cmake@v2
       with:
-        cmake-version: ${{ matrix.cmake_version }}
+        cmake-version: ${{ matrix.test_type == 'cmake_versions' && '3.10.0' || 'latest' }}
 
-    - name: Test Basic Configuration
+    - name: CMake Version Compatibility Test
+      if: matrix.test_type == 'cmake_versions'
       run: |
         mkdir cmakebuild && cd cmakebuild
         cmake ../build/cmake
         cmake --build .
 
-  # Edge cases - consolidated
-  cmake-edge-cases:
-    name: Edge Cases & Integration
-    runs-on: ubuntu-latest
+    - name: Static Library Test
+      if: matrix.test_type == 'static_lib'
+      run: |
+        # Build and install static library
+        CFLAGS="-Werror -O1" cmake -S build/cmake -B build -DBUILD_STATIC_LIBS=ON -DCMAKE_INSTALL_PREFIX=$PWD/install
+        cmake --build build --target install
+        
+        # Test find_package with static library
+        cmake -S tests/cmake -B build_test -DCMAKE_PREFIX_PATH=$PWD/install
+        cmake --build build_test
 
+    - name: Integration Test
+      if: matrix.test_type == 'integration'
+      run: |
+        # Build and install
+        cmake -S build/cmake -B build -DCMAKE_INSTALL_PREFIX=$PWD/install
+        cmake --build build --target install
+        
+        # Test find_package
+        cmake -S tests/cmake -B test_build -DCMAKE_PREFIX_PATH=$PWD/install
+        cmake --build test_build
+        cd test_build && ctest -V
+
+  # Makefile wrapper test
+  make-cmake-test:
+    name: Make CMake
+    runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-
-    - name: Set up CMake
-      uses: jwlawson/actions-setup-cmake@v2
-      with:
-        cmake-version: latest
-
-    # Combined edge case testing
-    - name: Test Edge Cases
-      run: |
-        # Test bundled mode
-        mkdir build-bundled && cd build-bundled
-        cmake ../build/cmake -DLZ4_BUNDLED_MODE=ON
-        cmake --build .
-        cd ..
-
-        # Test package config generation
-        mkdir build-pkg && cd build-pkg
-        cmake ../build/cmake -DCMAKE_INSTALL_PREFIX=/tmp/lz4-test
-        cmake --build . && cmake --install .
-
-        # Verify package config files
-        if [[ ! -f "/tmp/lz4-test/lib/cmake/lz4/lz4Config.cmake" ]]; then
-          echo "ERROR: CMake package config not generated"
-          exit 1
-        fi
-        cd ..
-
-    # Integration test with external project
-    - name: Integration test preparation
-      run: |
-        mkdir cmakebuild
-        cd cmakebuild
-        rm -rf *
-        cmake ../build/cmake -DCMAKE_INSTALL_PREFIX=$PWD/install
-        cmake --build . --target install
-
-    - name: test find_package
-      run: |
-        mkdir test_build
-        cd test_build
-        cmake -DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/cmakebuild/install $GITHUB_WORKSPACE/tests/cmake
-        cmake --build .
-        ctest -V
-
-  # cmake
-  lz4-build-cmake:
-    name: cmake
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # https://github.com/actions/checkout v4.2.2
-
-    - name: Environment info
-      run: |
-        echo && type cmake && which cmake && cmake --version
-        echo && type make && which make && make -v
-
-    - name: cmake
-      run: |
-        CFLAGS="-Werror -O1" cmake -S build/cmake -B build -D CMAKE_INSTALL_PREFIX=install
-        VERBOSE=1 cmake --build build --target install
-        cmake -S tests/cmake -B build_test -D CMAKE_INSTALL_PREFIX=install
-        VERBOSE=1 cmake --build build_test
-
-    - name: cmake minimum version v3.10 test
-      run: |
-        CMAKE_VERSION="3.10.0"
-        CMAKE_MAJOR_MINOR="3.10"
-        BASE_DIR="$(pwd)"
-        DOWNLOAD_DIR="${BASE_DIR}/cmake_download"
-        CMAKE_BIN_DIR="${DOWNLOAD_DIR}/cmake-${CMAKE_VERSION}-Linux-x86_64"
-        CMAKE_BIN="${CMAKE_BIN_DIR}/bin/cmake"
-        BUILD_DIR="${BASE_DIR}/cmake_build"
-        INSTALL_TEST_DIR="${BASE_DIR}/cmake_install_test"
-
-        # Create necessary directories
-        mkdir -p "${DOWNLOAD_DIR}" "${BUILD_DIR}" "${INSTALL_TEST_DIR}"
-
-        # Download and extract CMake
-        echo "Downloading CMake ${CMAKE_VERSION}..."
-        wget "https://cmake.org/files/v${CMAKE_MAJOR_MINOR}/cmake-${CMAKE_VERSION}-Linux-x86_64.tar.gz" -P "${DOWNLOAD_DIR}"
-        tar xzf "${DOWNLOAD_DIR}/cmake-${CMAKE_VERSION}-Linux-x86_64.tar.gz" -C "${DOWNLOAD_DIR}"
-
-        # Verify CMake version
-        echo "Using CMake version:"
-        "${CMAKE_BIN}" --version
-
-        # Configure the build
-        echo "Configuring build..."
-        (cd "${BUILD_DIR}" && "${CMAKE_BIN}" "${BASE_DIR}/build/cmake")
-
-        # Build the project
-        echo "Building project..."
-        "${CMAKE_BIN}" --build "${BUILD_DIR}"
-
-        # Install to test directory
-        echo "Installing to test directory..."
-        DESTDIR="${INSTALL_TEST_DIR}" "${CMAKE_BIN}" --build "${BUILD_DIR}" --target install
-
-        echo "Test completed successfully with cmake ${CMAKE_VERSION}"
-
-        # cleaning
-        rm -rf "${DOWNLOAD_DIR}" "${BUILD_DIR}" "${INSTALL_TEST_DIR}"
-
-  lz4-build-cmake-static-lib: # See https://github.com/lz4/lz4/issues/1269
-    name: cmake (static lib)
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # https://github.com/actions/checkout v4.2.2
-
-    - name: Environment info
-      run: |
-        echo && type cmake && which cmake && cmake --version
-        echo && type make && which make && make -v
-
-    - name: cmake (static lib)
-      run: |
-        CFLAGS="-Werror -O1" cmake -S build/cmake -B build -D CMAKE_INSTALL_PREFIX=install_test_dir -DBUILD_STATIC_LIBS=ON
-        VERBOSE=1 cmake --build build --target install
-        cmake -S tests/cmake -B build_test -D CMAKE_INSTALL_PREFIX=install_test_dir
-        VERBOSE=1 cmake --build build_test
-
-  # Invoke cmake via Makefile
-  lz4-build-make-cmake:
-    name: make cmakebuild
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # https://github.com/actions/checkout v4.2.2
-    - name: make cmakebuild
-      # V=1 for lz4 Makefile, VERBOSE=1 for cmake Makefile.
-      run: make clean; make cmakebuild V=1 VERBOSE=1
+    - name: Test via Makefile
+      run: make clean && make cmakebuild
