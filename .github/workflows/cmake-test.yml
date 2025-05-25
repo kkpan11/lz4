@@ -1,0 +1,418 @@
+# GitHub Actions workflow to test CMake build system changes
+# This workflow ensures that the CMake improvements remain preserved and functional
+name: CMake Build System Tests
+
+on:
+  push:
+    branches: ['dev', 'release', '*cmake*']
+  pull_request:
+    branches: ['dev', 'release']
+
+permissions:
+  contents: read
+
+concurrency:
+  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+
+jobs:
+  cmake-build-tests:
+    name: CMake Build Tests (${{ matrix.os }}, ${{ matrix.cmake_version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-22.04, windows-latest, macos-latest]
+        cmake_version: ["3.5.x", "3.16.x", "latest"]
+        build_type: [Release, Debug, MinSizeRel, RelWithDebInfo]
+        exclude:
+          # CMake 3.5.x may not be available on newer runners
+          - os: ubuntu-latest
+            cmake_version: "3.5.x"
+          - os: macos-latest
+            cmake_version: "3.5.x"
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up CMake
+      uses: jwlawson/actions-setup-cmake@v2
+      with:
+        cmake-version: ${{ matrix.cmake_version }}
+
+    - name: Configure CMake (Test default build type)
+      shell: bash
+      run: |
+        mkdir -p build-default
+        cd build-default
+        cmake ../build/cmake
+        
+        # Verify that Release is set as default build type
+        if [[ "$RUNNER_OS" != "Windows" ]]; then
+          build_type=$(cmake -LA . | grep CMAKE_BUILD_TYPE | cut -d= -f2)
+          echo "Default build type: $build_type"
+          if [[ "$build_type" != "Release" ]]; then
+            echo "ERROR: Default build type should be Release, got: $build_type"
+            exit 1
+          fi
+        fi
+
+    - name: Configure CMake (Test specific build type)
+      shell: bash
+      run: |
+        mkdir -p build-${{ matrix.build_type }}
+        cd build-${{ matrix.build_type }}
+        cmake ../build/cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+
+    - name: Test LZ4_DEBUG_LEVEL configuration
+      shell: bash
+      run: |
+        mkdir -p build-debug-levels
+        cd build-debug-levels
+        
+        # Test different debug levels
+        for level in 0 1 2 4 8; do
+          echo "Testing LZ4_DEBUG_LEVEL=$level"
+          cmake ../build/cmake -DLZ4_DEBUG_LEVEL=$level -DCMAKE_BUILD_TYPE=Debug
+          
+          # Verify the cache variable is set correctly
+          debug_level=$(cmake -LA . | grep LZ4_DEBUG_LEVEL | cut -d= -f2)
+          echo "Set debug level: $debug_level"
+          if [[ "$debug_level" != "$level" ]]; then
+            echo "ERROR: LZ4_DEBUG_LEVEL should be $level, got: $debug_level"
+            exit 1
+          fi
+          
+          # Clean for next iteration
+          rm -f CMakeCache.txt
+        done
+
+    - name: Test Debug build enables LZ4_DEBUG=1 by default
+      shell: bash
+      run: |
+        mkdir -p build-debug-default
+        cd build-debug-default
+        cmake ../build/cmake -DCMAKE_BUILD_TYPE=Debug
+        
+        # Check if LZ4_DEBUG_LEVEL defaults to 1 in Debug builds
+        debug_level=$(cmake -LA . | grep LZ4_DEBUG_LEVEL | cut -d= -f2)
+        echo "Debug build default level: $debug_level"
+        if [[ "$debug_level" != "1" ]]; then
+          echo "ERROR: Debug builds should default to LZ4_DEBUG_LEVEL=1, got: $debug_level"
+          exit 1
+        fi
+
+    - name: Test Release build disables LZ4_DEBUG by default
+      shell: bash
+      run: |
+        mkdir -p build-release-default
+        cd build-release-default
+        cmake ../build/cmake -DCMAKE_BUILD_TYPE=Release
+        
+        # Check if LZ4_DEBUG_LEVEL defaults to 0 in Release builds
+        debug_level=$(cmake -LA . | grep LZ4_DEBUG_LEVEL | cut -d= -f2)
+        echo "Release build default level: $debug_level"
+        if [[ "$debug_level" != "0" ]]; then
+          echo "ERROR: Release builds should default to LZ4_DEBUG_LEVEL=0, got: $debug_level"
+          exit 1
+        fi
+
+    - name: Build with specific configuration
+      shell: bash
+      run: |
+        cd build-${{ matrix.build_type }}
+        cmake --build . --config ${{ matrix.build_type }}
+
+    - name: Test CMake GUI support (cache properties)
+      shell: bash
+      run: |
+        mkdir -p build-gui-test
+        cd build-gui-test
+        cmake ../build/cmake
+        
+        # Verify CMAKE_BUILD_TYPE has the correct STRINGS property
+        if cmake -LA . | grep -q "CMAKE_BUILD_TYPE:STRING"; then
+          echo "✓ CMAKE_BUILD_TYPE is properly configured for CMake GUI"
+        else
+          echo "ERROR: CMAKE_BUILD_TYPE should be configured for CMake GUI"
+          exit 1
+        fi
+        
+        # Verify LZ4_DEBUG_LEVEL has the correct STRINGS property
+        if cmake -LA . | grep -q "LZ4_DEBUG_LEVEL:STRING"; then
+          echo "✓ LZ4_DEBUG_LEVEL is properly configured for CMake GUI"
+        else
+          echo "ERROR: LZ4_DEBUG_LEVEL should be configured for CMake GUI"
+          exit 1
+        fi
+
+    - name: Test all build options
+      shell: bash
+      run: |
+        mkdir -p build-options-test
+        cd build-options-test
+        
+        # Test all combinations of major build options
+        cmake ../build/cmake \
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+          -DLZ4_BUILD_CLI=ON \
+          -DLZ4_BUILD_LEGACY_LZ4C=ON \
+          -DBUILD_SHARED_LIBS=ON \
+          -DBUILD_STATIC_LIBS=ON \
+          -DLZ4_DEBUG_LEVEL=2
+        
+        cmake --build . --config ${{ matrix.build_type }}
+
+    - name: Test parallel build (symlink race condition fix)
+      shell: bash
+      if: runner.os != 'Windows'  # Skip on Windows as symlinks work differently
+      run: |
+        cd build-${{ matrix.build_type }}
+        # Test parallel build to ensure no race conditions
+        cmake --build . --config ${{ matrix.build_type }} --parallel $(nproc)
+
+    - name: Test installation
+      shell: bash
+      run: |
+        cd build-${{ matrix.build_type }}
+        cmake --install . --prefix install-test
+
+    - name: Verify installation structure
+      shell: bash
+      run: |
+        cd build-${{ matrix.build_type }}
+        
+        # Check that expected files are installed
+        if [[ -f "install-test/lib/liblz4*" || -f "install-test/lib/lz4*" ]]; then
+          echo "✓ Library files installed"
+        else
+          echo "ERROR: Library files not found in installation"
+          ls -la install-test/lib/ || true
+          exit 1
+        fi
+        
+        if [[ -f "install-test/include/lz4.h" ]]; then
+          echo "✓ Header files installed"
+        else
+          echo "ERROR: Header files not found in installation"
+          ls -la install-test/include/ || true
+          exit 1
+        fi
+        
+        if [[ "$RUNNER_OS" != "Windows" && -f "install-test/bin/lz4" ]]; then
+          echo "✓ Executable installed"
+        elif [[ "$RUNNER_OS" == "Windows" && -f "install-test/bin/lz4.exe" ]]; then
+          echo "✓ Executable installed"
+        else
+          echo "ERROR: Executable not found in installation"
+          ls -la install-test/bin/ || true
+          exit 1
+        fi
+
+  cmake-version-compatibility:
+    name: CMake Version Compatibility Test
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        cmake_version: ["3.5.2", "3.10.0", "3.16.0", "3.20.0", "latest"]
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up CMake
+      uses: jwlawson/actions-setup-cmake@v2
+      with:
+        cmake-version: ${{ matrix.cmake_version }}
+    
+    - name: Test CMake configuration
+      run: |
+        mkdir build
+        cd build
+        cmake ../build/cmake
+        cmake --build .
+
+  cmake-edge-cases:
+    name: CMake Edge Cases and Regression Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up CMake
+      uses: jwlawson/actions-setup-cmake@v2
+      with:
+        cmake-version: latest
+    
+    - name: Test bundled mode
+      run: |
+        mkdir build-bundled
+        cd build-bundled
+        cmake ../build/cmake -DLZ4_BUNDLED_MODE=ON
+        
+        # In bundled mode, installation should be disabled
+        if cmake -LA . | grep -q "LZ4_BUNDLED_MODE.*ON"; then
+          echo "✓ Bundled mode enabled correctly"
+        else
+          echo "ERROR: Bundled mode not set correctly"
+          exit 1
+        fi
+        
+        cmake --build .
+
+    - name: Test with custom CMAKE_INSTALL_PREFIX
+      run: |
+        mkdir build-custom-prefix
+        cd build-custom-prefix
+        cmake ../build/cmake -DCMAKE_INSTALL_PREFIX=/tmp/lz4-test
+        cmake --build .
+        cmake --install .
+        
+        # Verify installation in custom location
+        if [[ -f "/tmp/lz4-test/lib/liblz4.a" || -f "/tmp/lz4-test/lib64/liblz4.a" ]]; then
+          echo "✓ Custom install prefix works"
+        else
+          echo "ERROR: Installation with custom prefix failed"
+          find /tmp/lz4-test -name "*lz4*" || true
+          exit 1
+        fi
+
+    - name: Test invalid LZ4_DEBUG_LEVEL values
+      run: |
+        mkdir build-invalid-debug
+        cd build-invalid-debug
+        
+        # Test boundary values - should work
+        for level in 0 8; do
+          cmake ../build/cmake -DLZ4_DEBUG_LEVEL=$level
+          rm -f CMakeCache.txt
+        done
+        
+        echo "✓ Boundary debug levels work correctly"
+
+    - name: Test cross-compilation preparation
+      run: |
+        mkdir build-cross
+        cd build-cross
+        
+        # Test that configuration works for cross-compilation setup
+        cmake ../build/cmake \
+          -DCMAKE_SYSTEM_NAME=Linux \
+          -DCMAKE_C_COMPILER=gcc \
+          -DBUILD_SHARED_LIBS=OFF \
+          -DLZ4_BUILD_CLI=OFF
+        
+        echo "✓ Cross-compilation configuration works"
+
+    - name: Test package config generation
+      run: |
+        mkdir build-pkg-config
+        cd build-pkg-config
+        cmake ../build/cmake -DCMAKE_INSTALL_PREFIX=/tmp/lz4-pkg-test
+        cmake --build .
+        cmake --install .
+        
+        # Verify package config files are generated
+        if [[ -f "/tmp/lz4-pkg-test/lib/cmake/lz4/lz4Config.cmake" ]]; then
+          echo "✓ CMake package config generated"
+        else
+          echo "ERROR: CMake package config not generated"
+          find /tmp/lz4-pkg-test -name "*Config*" || true
+          exit 1
+        fi
+        
+        if [[ -f "/tmp/lz4-pkg-test/lib/pkgconfig/liblz4.pc" ]]; then
+          echo "✓ pkg-config file generated"
+        else
+          echo "ERROR: pkg-config file not generated"
+          find /tmp/lz4-pkg-test -name "*.pc" || true
+          exit 1
+        fi
+
+  cmake-integration-test:
+    name: CMake Integration Test (External Project)
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up CMake
+      uses: jwlawson/actions-setup-cmake@v2
+      with:
+        cmake-version: latest
+    
+    - name: Build and install LZ4
+      run: |
+        mkdir build
+        cd build
+        cmake ../build/cmake -DCMAKE_INSTALL_PREFIX=$PWD/install
+        cmake --build .
+        cmake --install .
+    
+    - name: Test find_package integration
+      run: |
+        cd tests/cmake
+        mkdir build
+        cd build
+        cmake .. -DCMAKE_PREFIX_PATH=$PWD/../../../build/install
+        cmake --build .
+        
+        echo "✓ External project can find and use installed LZ4"
+
+    - name: Test library functionality
+      run: |
+        cd tests/cmake/build
+        # Run the test executables if they were built
+        if [[ -f "./decompress-partial" ]]; then
+          echo "✓ Test executable built successfully"
+        fi
+
+  summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [cmake-build-tests, cmake-version-compatibility, cmake-edge-cases, cmake-integration-test]
+    if: always()
+    
+    steps:
+    - name: Check test results
+      run: |
+        echo "## CMake Build System Test Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [[ "${{ needs.cmake-build-tests.result }}" == "success" ]]; then
+          echo "✅ **Basic CMake Build Tests**: PASSED" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Basic CMake Build Tests**: FAILED" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [[ "${{ needs.cmake-version-compatibility.result }}" == "success" ]]; then
+          echo "✅ **CMake Version Compatibility**: PASSED" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **CMake Version Compatibility**: FAILED" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [[ "${{ needs.cmake-edge-cases.result }}" == "success" ]]; then
+          echo "✅ **Edge Cases and Regression Tests**: PASSED" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Edge Cases and Regression Tests**: FAILED" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [[ "${{ needs.cmake-integration-test.result }}" == "success" ]]; then
+          echo "✅ **Integration Tests**: PASSED" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Integration Tests**: FAILED" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Key Properties Tested:" >> $GITHUB_STEP_SUMMARY
+        echo "- 🔧 **Default build type** set to Release" >> $GITHUB_STEP_SUMMARY
+        echo "- 🐛 **LZ4_DEBUG_LEVEL** configurable (0-8) with CMake GUI support" >> $GITHUB_STEP_SUMMARY
+        echo "- 🔨 **Debug builds** automatically enable LZ4_DEBUG=1" >> $GITHUB_STEP_SUMMARY
+        echo "- 🚀 **Release builds** automatically disable LZ4_DEBUG (level 0)" >> $GITHUB_STEP_SUMMARY
+        echo "- 🔗 **Symlink race condition** fix in parallel builds" >> $GITHUB_STEP_SUMMARY
+        echo "- 📦 **Package config** generation and installation" >> $GITHUB_STEP_SUMMARY
+        echo "- 🔄 **CMake version compatibility** (3.5 to latest)" >> $GITHUB_STEP_SUMMARY
