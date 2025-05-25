@@ -167,6 +167,17 @@ else()
 endif(BUILD_SHARED_LIBS)
 
 #-----------------------------------------------------------------------------
+# DEBUG CONFIGURATION - Set LZ4_DEBUG for Debug builds to enable assert()
+#-----------------------------------------------------------------------------
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  if(MSVC)
+    add_definitions(/DLZ4_DEBUG=1)
+  else()
+    add_definitions(-DLZ4_DEBUG=1)
+  endif()
+endif()
+
+#-----------------------------------------------------------------------------
 # NAMESPACE CONFIGURATION - xxHash namespace settings
 #-----------------------------------------------------------------------------
 # xxhash namespace
