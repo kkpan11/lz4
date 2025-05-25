@@ -23,15 +23,9 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, ubuntu-22.04, windows-latest, macos-latest]
-        cmake_version: ["3.5.x", "3.16.x", "latest"]
+        cmake_version: ["3.16.x", "latest"]
         build_type: [Release, Debug, MinSizeRel, RelWithDebInfo]
-        exclude:
-          # CMake 3.5.x may not be available on newer runners
-          - os: ubuntu-latest
-            cmake_version: "3.5.x"
-          - os: macos-latest
-            cmake_version: "3.5.x"
-    
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -183,12 +177,6 @@ jobs:
       run: |
         cd build-${{ matrix.build_type }}
         
-        # Check that expected files are installed
-        echo look at install-test
-        ls install-test
-        echo look at install-test/lib
-        ls install-test/lib
-
         # Check for library files using proper glob expansion
         shopt -s nullglob  # Make globs expand to nothing if no matches
         lib_files=(install-test/lib/liblz4* install-test/lib/lz4*)
@@ -226,7 +214,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        cmake_version: ["3.5.2", "3.10.0", "3.16.0", "3.20.0", "latest"]
+        cmake_version: ["3.10.0", "3.16.0", "3.20.0", "latest"]
     
     steps:
     - name: Checkout repository
