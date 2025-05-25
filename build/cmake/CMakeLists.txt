@@ -167,13 +167,28 @@ else()
 endif(BUILD_SHARED_LIBS)
 
 #-----------------------------------------------------------------------------
-# DEBUG CONFIGURATION - Set LZ4_DEBUG for Debug builds to enable assert()
+# DEBUG CONFIGURATION - Configurable LZ4_DEBUG level
 #-----------------------------------------------------------------------------
+# LZ4_DEBUG levels:
+# 0 - Disable everything (default for Release)
+# 1 - Enable assert() statements  
+# 2-8 - Enable debug traces with increasing verbosity
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set(LZ4_DEBUG_LEVEL_DEFAULT 1)
+else()
+  set(LZ4_DEBUG_LEVEL_DEFAULT 0)
+endif()
+
+set(LZ4_DEBUG_LEVEL ${LZ4_DEBUG_LEVEL_DEFAULT} CACHE STRING 
+    "LZ4 debug level: 0=disabled, 1=assert(), 2-8=debug traces with increasing verbosity")
+set_property(CACHE LZ4_DEBUG_LEVEL PROPERTY STRINGS "0" "1" "2" "3" "4" "5" "6" "7" "8")
+
+# Apply LZ4_DEBUG configuration if level > 0
+if(LZ4_DEBUG_LEVEL GREATER 0)
   if(MSVC)
-    add_definitions(/DLZ4_DEBUG=1)
+    add_definitions(/DLZ4_DEBUG=${LZ4_DEBUG_LEVEL})
   else()
-    add_definitions(-DLZ4_DEBUG=1)
+    add_definitions(-DLZ4_DEBUG=${LZ4_DEBUG_LEVEL})
   endif()
 endif()
 
