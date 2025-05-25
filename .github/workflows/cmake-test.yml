@@ -177,17 +177,21 @@ jobs:
         cd ..
     
     # Integration test with external project
-    - name: Test External Integration
+    - name: Integration test preparation
       run: |
-        # Build and install LZ4 first
-        mkdir cmakebuild && cd cmakebuild
+        mkdir cmakebuild
+        cd cmakebuild
+        rm -rf *
         cmake ../build/cmake -DCMAKE_INSTALL_PREFIX=$PWD/install
-        cmake --build . && cmake --install .
-        
-        # Test find_package integration
-        cd ../tests/cmake && mkdir build && cd build
-        cmake .. -DCMAKE_PREFIX_PATH=$PWD/../../../build/install
+        cmake --build . --target install
+
+    - name: test find_package
+      run: |
+        mkdir test_build
+        cd test_build
+        cmake -DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/cmakebuild/install $GITHUB_WORKSPACE/tests/cmake
         cmake --build .
+        ctest -V
 
   # Simple summary
   summary:
