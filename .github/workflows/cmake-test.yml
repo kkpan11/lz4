@@ -227,8 +227,8 @@ jobs:
     
     - name: Test CMake configuration
       run: |
-        mkdir build
-        cd build
+        mkdir cmakebuild
+        cd cmakebuild
         cmake ../build/cmake
         cmake --build .
 
