@@ -1,6 +1,6 @@
 version: 1.0.{build}
 
-# Test matrix: different compilers and platforms
+# Test matrix: MinGW compilers only (Visual Studio testing moved to GitHub Actions)
 environment:
   matrix:
     - COMPILER: gcc
@@ -9,29 +9,18 @@ environment:
       PLATFORM: mingw64
     - COMPILER: clang
       PLATFORM: mingw64
-    - COMPILER: visual
-      PLATFORM: Win32
-      CONFIGURATION: Debug
-    - COMPILER: visual
-      PLATFORM: Win32
-      CONFIGURATION: Release
-    - COMPILER: visual
-      PLATFORM: x64
-      CONFIGURATION: Release
 
 install:
-  - echo Installing %COMPILER% %PLATFORM% %CONFIGURATION%
+  - echo Installing %COMPILER% %PLATFORM%
   - mkdir bin
-  # Setup MinGW environment for GCC/Clang
-  - if not [%COMPILER%]==[visual] set "PATH_MINGW32=c:\MinGW\bin;c:\MinGW\usr\bin"
-  - if not [%COMPILER%]==[visual] set "PATH_MINGW64=c:\msys64\mingw64\bin;c:\msys64\usr\bin"
-  - if not [%COMPILER%]==[visual] copy C:\MinGW\bin\mingw32-make.exe C:\MinGW\bin\make.exe >nul 2>&1
-  - if not [%COMPILER%]==[visual] copy C:\MinGW\bin\gcc.exe C:\MinGW\bin\cc.exe >nul 2>&1
-  # Setup Visual Studio x64 library paths
-  - if [%COMPILER%]==[visual] if [%PLATFORM%]==[x64] set "ADDITIONALPARAM=/p:LibraryPath=C:\Program Files\Microsoft SDKs\Windows\v7.1\lib\x64;c:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\lib\amd64;C:\Program Files (x86)\Microsoft Visual Studio 10.0\;C:\Program Files (x86)\Microsoft Visual Studio 10.0\lib\amd64;"
+  # Setup MinGW environment
+  - set "PATH_MINGW32=c:\MinGW\bin;c:\MinGW\usr\bin"
+  - set "PATH_MINGW64=c:\msys64\mingw64\bin;c:\msys64\usr\bin"
+  - copy C:\MinGW\bin\mingw32-make.exe C:\MinGW\bin\make.exe >nul 2>&1
+  - copy C:\MinGW\bin\gcc.exe C:\MinGW\bin\cc.exe >nul 2>&1
 
 build_script:
-  - echo "*** Building %COMPILER% %PLATFORM% %CONFIGURATION% ***"
+  - echo "*** Building %COMPILER% %PLATFORM% ***"
   # Configure PATH for MinGW builds
   - if [%PLATFORM%]==[mingw32] set PATH=%PATH_MINGW32%;%PATH%
   - if [%PLATFORM%]==[mingw64] set PATH=%PATH_MINGW64%;%PATH%
@@ -70,15 +59,6 @@ build_script:
       copy tests\*.exe programs\
     )
   
-  # Visual Studio Build
-  - if [%COMPILER%]==[visual] (
-      echo "Visual Studio build started" &&
-      set "MSBUILD_COMMON=/m /verbosity:minimal /property:Optimize=false /t:Clean,Build /p:Platform=%PLATFORM% /p:Configuration=%CONFIGURATION% /logger:C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll" &&
-      msbuild "build\VS2022\lz4.sln" %MSBUILD_COMMON% /property:PlatformToolset=v110 &&
-      msbuild "build\VS2022\lz4.sln" %MSBUILD_COMMON% /property:PlatformToolset=v120 &&
-      copy build\VS2022\bin\%PLATFORM%_%CONFIGURATION%\*.exe programs\
-    )
-  
   # Create release archives (GCC only)
   - if [%COMPILER%]==[gcc] if [%PLATFORM%]==[mingw64] 7z.exe a -bb1 bin\lz4_x64.zip NEWS .\bin\lz4.exe README.md .\bin\example .\bin\dll .\bin\static .\bin\include
   - if [%COMPILER%]==[gcc] if [%PLATFORM%]==[mingw64] appveyor PushArtifact bin\lz4_x64.zip
@@ -86,7 +66,7 @@ build_script:
   - if [%COMPILER%]==[gcc] if [%PLATFORM%]==[mingw32] appveyor PushArtifact bin\lz4_x86.zip
 
 test_script:
-  - echo "*** Testing %COMPILER% %PLATFORM% %CONFIGURATION% ***"
+  - echo "*** Testing %COMPILER% %PLATFORM% ***"
   - cd programs
   - lz4 -h
   - lz4 -i1b lz4.exe
