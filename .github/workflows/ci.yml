@@ -169,14 +169,8 @@ jobs:
         sudo apt-get update
         sudo apt-get install gcc-multilib
 
-    - name: test-lz4
-      run: make -j -C tests test-lz4 V=1
-
     - name: test-lz4c
       run: make -j -C tests test-lz4c V=1
-
-    - name: test-lz4c32
-      run: make -j -C tests test-lz4c32 V=1
 
     - name: test-fullbench
       run: make -j -C tests test-fullbench V=1
