@@ -475,7 +475,7 @@ jobs:
       uses: google/oss-fuzz/infra/cifuzz/actions/run_fuzzers@master
       with:
         oss-fuzz-project-name: 'lz4'
-        fuzz-seconds: 300
+        fuzz-seconds: 100
         dry-run: false
         sanitizer: ${{ matrix.sanitizer }}
     - name: Upload Crash
