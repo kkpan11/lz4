@@ -61,8 +61,6 @@ jobs:
         apt-cache search gcc | grep "^gcc-[0-9\.]* " | sort
         echo "=== Available lib32gcc Packages (i386) ==="
         apt-cache search lib32gcc | grep "^lib32gcc-" | sort
-        echo "=== Available libx32gcc Packages (x32) ==="
-        apt-cache search libx32gcc | grep "^libx32gcc-" | sort
         echo "=== Available GCC Multilib Packages ==="
         apt-cache search multilib | grep "gcc-" | sort
         echo "=== Available Clang Packages ==="
