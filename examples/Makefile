@@ -36,14 +36,20 @@ CFLAGS     = $(WFLAGS) -O2 $(USERCFLAGS)
 
 TESTFILE   = Makefile
 TESTFILE_SMALL= .gitignore
-SLIBLZ4   := $(LIBDIR)/liblz4.a
 LZ4DIR     = ../programs
 LZ4        = $(LZ4DIR)/lz4
+LIBLZ4DIR  = ../lib
+LIBLZ4SRCS = $(notdir $(wildcard $(LIBLZ4DIR)/*.c))
+LIBLZ4OBJS = $(LIBLZ4SRCS:.c=.o)
+SLIBLZ4   := liblz4.a
 
 default: all
 
-$(SLIBLZ4): $(LIBDIR)/lz4.c $(LIBDIR)/lz4hc.c $(LIBDIR)/lz4frame.c $(LIBDIR)/lz4.h $(LIBDIR)/lz4hc.h $(LIBDIR)/lz4frame.h $(LIBDIR)/lz4frame_static.h
-	$(MAKE) -j -C $(LIBDIR) liblz4.a
+C_SRCDIRS = . ../lib
+include ../build/make/multiconf.make
+
+$(SLIBLZ4):
+$(eval $(call static_library,$(SLIBLZ4), $(LIBLZ4OBJS)))
 
 ALL = print_version \
 	  simple_buffer \

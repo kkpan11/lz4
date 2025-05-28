@@ -44,7 +44,7 @@ in single-thread mode.
 [lzbench]: https://github.com/inikep/lzbench
 [Silesia Corpus]: http://sun.aei.polsl.pl/~sdeor/index.php?page=silesia
 
-|  Compressor             | Ratio   | Compression | Decompression |
+|  Compressor             | Factor  | Compression | Decompression |
 |  ----------             | -----   | ----------- | ------------- |
 |  memcpy                 |  1.000  | 13700 MB/s  |  13700 MB/s   |
 |**LZ4 default (v1.9.0)** |**2.101**| **780 MB/s**| **4970 MB/s** |
@@ -59,9 +59,6 @@ in single-thread mode.
 
 [zlib]: http://www.zlib.net/
 [Zstandard]: http://www.zstd.net/
-
-LZ4 is also compatible and optimized for x32 mode (`-mx32`),
-for which it provides additional speed performance.
 
 
 Installation
