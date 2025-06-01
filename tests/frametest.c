@@ -715,10 +715,13 @@ static int unitTests(U32 seed, double compressibility)
         size_t const srcSize = 65 KB; /* must be > 64 KB to avoid short-size optimizations */
         size_t const dstCapacity = LZ4F_compressFrameBound(srcSize, NULL);
         size_t cSizeNoDict, cSizeWithDict;
-        LZ4F_CDict* const cdict = LZ4F_createCDict(CNBuffer, dictSize);
-        if (cdict == NULL) goto _output_error;
-        CHECK( LZ4F_createCompressionContext(&cctx, LZ4F_VERSION) );
+        LZ4F_CDict* cdict = NULL;
 
+        CHECK( LZ4F_createCompressionContext(&cctx, LZ4F_VERSION) );
+        cdict = LZ4F_createCDict(CNBuffer, dictSize);
+        if (cdict == NULL)
+            goto _output_error;
+        
         DISPLAYLEVEL(3, "Testing LZ4F_createCDict_advanced : ");
         {   LZ4F_CDict* const cda = LZ4F_createCDict_advanced(lz4f_cmem_test, CNBuffer, dictSize);
             if (cda == NULL) goto _output_error;
