@@ -301,12 +301,12 @@ static int LZ4_isAligned(const void* ptr, size_t alignment)
 #include <limits.h>
 #if defined(__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
 # include <stdint.h>
-  typedef  uint8_t BYTE;
-  typedef uint16_t U16;
-  typedef uint32_t U32;
-  typedef  int32_t S32;
-  typedef uint64_t U64;
-  typedef uintptr_t uptrval;
+  typedef unsigned char BYTE; /*uint8_t not necessarily blessed to alias arbitrary type*/
+  typedef uint16_t      U16;
+  typedef uint32_t      U32;
+  typedef  int32_t      S32;
+  typedef uint64_t      U64;
+  typedef uintptr_t     uptrval;
 #else
 # if UINT_MAX != 4294967295UL
 #   error "LZ4 code (when not C++ or C99) assumes that sizeof(int) == 4"
