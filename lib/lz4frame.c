@@ -691,6 +691,13 @@ static int ctxTypeID_to_size(int ctxTypeID) {
     }
 }
 
+size_t LZ4F_cctx_size(const LZ4F_cctx* cctx) {
+    if (cctx == NULL) {
+        return 0;
+    }
+    return sizeof(*cctx) + cctx->maxBufferSize + ctxTypeID_to_size(cctx->lz4CtxAlloc);
+}
+
 /* LZ4F_compressBegin_internal()
  * Note: only accepts @cdict _or_ @dictBuffer as non NULL.
  */
@@ -1329,6 +1336,15 @@ LZ4F_errorCode_t LZ4F_freeDecompressionContext(LZ4F_dctx* dctx)
       LZ4F_free(dctx, dctx->cmem);
     }
     return result;
+}
+
+size_t LZ4F_dctx_size(const LZ4F_dctx* dctx) {
+    if (dctx == NULL) {
+        return 0;
+    }
+    return sizeof(*dctx)
+         + (dctx->tmpIn != NULL ? dctx->maxBlockSize + BFSize : 0)
+         + (dctx->tmpOutBuffer != NULL ? dctx->maxBufferSize : 0);
 }
 
 
